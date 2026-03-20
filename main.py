@@ -90,3 +90,7 @@ TOURS_DATA = {
 @app.post("/")
 def root():
     return TOURS_DATA
+
+@app.get("/ping")
+def pingochka():
+    return {"answer: " : "okey epta!"}
