@@ -116,7 +116,7 @@ export default function App() {
         </aside>
 
         <div className="contentArea">
-          <header className="mobileTopbar">
+          <header className="navbar mobileTopbar">
             <button
               type="button"
               className="burger"

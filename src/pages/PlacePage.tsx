@@ -71,7 +71,7 @@ export default function PlacePage(props: { profile: AuthProfile | null }) {
           <button type="button" className="secondaryBtn" onClick={() => navigate('/map')}>
             Назад
           </button>
-          <button type="button" className="primaryBtn" onClick={() => setModalOpen(true)}>
+          <button type="button" className="accentBtn" onClick={() => setModalOpen(true)}>
             Окунуться в атмосферу
           </button>
         </div>
@@ -85,7 +85,7 @@ export default function PlacePage(props: { profile: AuthProfile | null }) {
             style={{
               borderRadius: 18,
               border: '1px solid var(--border)',
-              background: 'rgba(255,255,255,0.02)',
+              background: 'rgba(255,255,255,0.85)',
               padding: 16,
             }}
           >
@@ -110,7 +110,7 @@ export default function PlacePage(props: { profile: AuthProfile | null }) {
             style={{
               borderRadius: 18,
               border: '1px solid var(--border)',
-              background: 'rgba(255,255,255,0.02)',
+              background: 'rgba(255,255,255,0.85)',
               padding: 16,
             }}
           >
@@ -139,7 +139,7 @@ export default function PlacePage(props: { profile: AuthProfile | null }) {
             style={{
               borderRadius: 18,
               border: '1px solid var(--border)',
-              background: 'rgba(255,255,255,0.02)',
+              background: 'rgba(255,255,255,0.85)',
               padding: 16,
             }}
           >

@@ -113,7 +113,7 @@ export default function PlaceSidePanel(props: {
             <button type="button" className="primaryBtn secondaryBtnWide" onClick={props.onMore}>
               Подробнее
             </button>
-            <button type="button" className="secondaryBtn secondaryBtnWide" onClick={props.onAtmosphere}>
+            <button type="button" className="accentBtn secondaryBtnWide" onClick={props.onAtmosphere}>
               Окунуться в атмосферу места
             </button>
           </div>

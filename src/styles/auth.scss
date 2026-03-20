@@ -98,7 +98,7 @@
   border-radius: $radius-lg;
   padding: 16px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.78);
   color: var(--text);
   cursor: pointer;
   transition: transform 0.15s, border-color 0.15s, background 0.15s;
@@ -107,8 +107,8 @@
 
 .roleCard:hover {
   transform: translateY(-2px);
-  border-color: rgba(170, 59, 255, 0.6);
-  background: rgba(170, 59, 255, 0.08);
+  border-color: rgba($color-accent, 0.65);
+  background: rgba($color-accent, 0.08);
 }
 
 .roleTitle {
@@ -141,14 +141,15 @@
 .input {
   border-radius: $radius-md;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.72);
   padding: 12px 12px;
   color: var(--text);
   outline: none;
 }
 
 .input:focus {
-  border-color: rgba(170, 59, 255, 0.65);
+  border-color: rgba($color-accent, 0.7);
+  box-shadow: 0 0 0 4px rgba($color-accent, 0.15);
 }
 
 .formError {
@@ -190,7 +191,7 @@
 
 .wizardProgressFill {
   height: 100%;
-  background: rgba(170, 59, 255, 0.7);
+  background: rgba($color-accent, 0.75);
   border-radius: $radius-md;
 }
 
@@ -224,7 +225,7 @@
   border-radius: $radius-md;
   padding: 12px 12px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.86);
   color: var(--text);
   cursor: pointer;
   transition: transform 0.12s, border-color 0.12s, background 0.12s;
@@ -233,12 +234,12 @@
 
 .choice:hover {
   transform: translateY(-1px);
-  border-color: rgba(170, 59, 255, 0.5);
+  border-color: rgba($color-accent, 0.55);
 }
 
 .choice.checked {
-  border-color: rgba(170, 59, 255, 0.75);
-  background: rgba(170, 59, 255, 0.12);
+  border-color: rgba($color-accent-2, 0.65);
+  background: rgba($color-accent-2, 0.18);
 }
 
 .choiceRadio {
@@ -261,8 +262,8 @@
 .secondaryBtn {
   border-radius: $radius-md;
   padding: 10px 14px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba($color-accent, 0.55);
+  background: rgba(255, 255, 255, 0.85);
   color: var(--text);
   cursor: pointer;
 }
@@ -272,11 +273,21 @@
   cursor: not-allowed;
 }
 
+.secondaryBtn:hover {
+  border-color: rgba($color-accent, 0.7);
+  background: rgba($color-accent, 0.06);
+}
+
+.secondaryBtn:focus-visible {
+  outline: 3px solid rgba($color-accent, 0.25);
+  outline-offset: 2px;
+}
+
 .primaryBtn {
   border-radius: $radius-md;
   padding: 10px 14px;
-  border: 1px solid rgba(170, 59, 255, 0.55);
-  background: rgba(170, 59, 255, 0.18);
+  border: 1px solid rgba($color-accent, 0.55);
+  background: rgba($color-accent, 0.18);
   color: var(--text);
   cursor: pointer;
 }
@@ -284,5 +295,41 @@
 .primaryBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.primaryBtn:hover {
+  border-color: rgba($color-accent, 0.7);
+  background: rgba($color-accent, 0.24);
+}
+
+.primaryBtn:focus-visible {
+  outline: 3px solid rgba($color-accent, 0.25);
+  outline-offset: 2px;
+}
+
+// CTA “вау” кнопки — жёлтый (дополнительный акцент).
+.accentBtn {
+  border-radius: $radius-md;
+  padding: 10px 14px;
+  border: 1px solid rgba($color-accent-2, 0.65);
+  background: rgba($color-accent-2, 0.22);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.accentBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.accentBtn:hover {
+  border-color: rgba($color-accent-2, 0.85);
+  background: rgba($color-accent-2, 0.28);
+}
+
+.accentBtn:focus-visible {
+  outline: 3px solid rgba($color-accent-2, 0.28);
+  outline-offset: 2px;
 }
 

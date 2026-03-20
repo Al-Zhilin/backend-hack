@@ -5,7 +5,7 @@ export default function PlaceFullWidthHero(props: { image: string; title: string
         borderRadius: 22,
         overflow: 'hidden',
         border: '1px solid var(--border)',
-        background: 'rgba(255,255,255,0.02)',
+        background: 'rgba(255,255,255,0.85)',
         position: 'relative',
         minHeight: 220,
       }}
@@ -24,7 +24,7 @@ export default function PlaceFullWidthHero(props: { image: string; title: string
         style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.2), rgba(0,0,0,0.85))',
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.78))',
         }}
       />
       <div style={{ position: 'relative', padding: 18 }}>

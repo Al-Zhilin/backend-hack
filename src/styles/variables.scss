@@ -1,16 +1,19 @@
-$color-bg: #0b0f1a;
-$color-surface: rgba(255, 255, 255, 0.06);
-$color-text: rgba(255, 255, 255, 0.92);
-$color-muted: rgba(255, 255, 255, 0.68);
-$color-border: rgba(255, 255, 255, 0.12);
-$color-accent: #aa3bff;
-$color-accent-2: #22c55e;
+// Design tokens: светлая “travel-service” тема (Airbnb-like).
+// Основной акцент: зелёный, дополнительный: жёлтый.
+$color-bg: #f7f8fb;
+$color-surface: rgba(2, 6, 23, 0.045);
+$color-text: rgba(2, 6, 23, 0.92);
+$color-muted: rgba(2, 6, 23, 0.65);
+$color-border: rgba(2, 6, 23, 0.12);
+
+$color-accent: #16a34a; // green (primary)
+$color-accent-2: #facc15; // yellow (secondary)
 
 $radius-lg: 18px;
 $radius-md: 14px;
 $radius-sm: 10px;
 
-$shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+$shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
 
 $container-max: 1200px;
 

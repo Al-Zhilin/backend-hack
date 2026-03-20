@@ -9,7 +9,7 @@
 .sidebar {
   width: 280px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(2, 6, 23, 0.03);
   border-right: 1px solid var(--border);
   display: none;
   flex-direction: column;
@@ -60,13 +60,13 @@
 }
 
 .navItem:hover {
-  border-color: rgba(170, 59, 255, 0.5);
-  background: rgba(170, 59, 255, 0.08);
+  border-color: rgba($color-accent, 0.55);
+  background: rgba($color-accent, 0.10);
 }
 
 .navItem.active {
-  border-color: rgba(170, 59, 255, 0.65);
-  background: rgba(170, 59, 255, 0.12);
+  border-color: rgba($color-accent, 0.75);
+  background: rgba($color-accent, 0.14);
 }
 
 .contentArea {
@@ -88,10 +88,23 @@
   overflow: auto;
 }
 
+// Универсальная карточка для контента (контрастные поверхности без синего цвета).
+.card {
+  border: 1px solid var(--border);
+  border-radius: $radius-lg;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 20px 60px rgba(2, 6, 23, 0.08);
+}
+
+.navbar {
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid var(--border);
+}
+
 .primaryBtn {
   margin-top: 14px;
-  background: rgba(170, 59, 255, 0.18);
-  border: 1px solid rgba(170, 59, 255, 0.55);
+  background: rgba($color-accent, 0.18);
+  border: 1px solid rgba($color-accent, 0.55);
   color: var(--text);
   padding: 10px 14px;
   border-radius: $radius-md;
@@ -115,7 +128,7 @@
 
 .burger {
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(2, 6, 23, 0.03);
   color: var(--text);
   border-radius: $radius-md;
   padding: 10px 12px;
@@ -148,7 +161,7 @@
   left: 0;
   width: min(86vw, 320px);
   height: calc(100svh - 58px);
-  background: rgba(20, 22, 35, 0.96);
+  background: rgba(255, 255, 255, 0.95);
   border-right: 1px solid var(--border);
   transform: translateX(-104%);
   transition: transform 0.25s;

@@ -153,7 +153,7 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
       ) : (
         <>
           <div className="mapOverlayLeft">
-            <div className="filtersCard">
+            <div className="card filtersCard">
               <div className="filtersTitle">Фильтры по тегам</div>
               <div className="chips" role="group" aria-label="Теги фильтра">
                 {availableChips.map((chip) => {
@@ -227,7 +227,7 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                 <Polyline
                   geometry={routeLocations.map((l) => [l.lat, l.lng])}
                   options={{
-                    strokeColor: 'rgba(170, 59, 255, 0.85)',
+                    strokeColor: 'rgba(22, 163, 74, 0.85)',
                     strokeWidth: 5,
                     strokeOpacity: 0.9,
                   }}
@@ -236,12 +236,12 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
 
               {/* Все “обычные” точки (кластеры), кроме точек маршрута */}
               {clusterLocations.length > 0 && (
-                <Clusterer options={{ preset: 'islands#violetIcon', groupByCoordinates: false }}>
+                <Clusterer options={{ preset: 'islands#greenIcon', groupByCoordinates: false }}>
                   {clusterLocations.map((loc) => (
                     <Placemark
                       key={loc.id}
                       geometry={[loc.lat, loc.lng]}
-                      options={{ preset: 'islands#violetIcon' }}
+                      options={{ preset: 'islands#greenIcon' }}
                       instanceRef={onPlacemarkInstanceRef(loc.id) as any}
                     />
                   ))}
@@ -254,7 +254,7 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                   key={`${loc.id}_route_${idx}`}
                   geometry={[loc.lat, loc.lng]}
                   options={{
-                    preset: idx === 0 ? 'islands#blueIcon' : 'islands#violetIcon',
+                    preset: idx === 0 ? 'islands#greenIcon' : 'islands#greenIcon',
                   }}
                   properties={{
                     iconContent: `<div style="color:#ffffff;font-weight:900;">${idx + 1}</div>`,
@@ -267,7 +267,7 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
 
           {/* Таймлайн поверх карты */}
           <div className="timelineOverlay">
-            <div className="timelineCard">
+            <div className="card timelineCard">
               <div className="timelineTitle">Таймлайн маршрута</div>
               <div className="timelineItems">
                 {timeline.map((t) => (

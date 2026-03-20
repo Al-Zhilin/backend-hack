@@ -23,7 +23,7 @@ function PhotoStrip(props: { photos: string[] }) {
             borderRadius: 12,
             overflow: 'hidden',
             border: '1px solid rgba(255,255,255,0.08)',
-            background: 'rgba(255,255,255,0.02)',
+            background: 'rgba(255,255,255,0.8)',
           }}
         >
           <img src={src} alt={`Фото ${idx + 1}`} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
@@ -83,9 +83,9 @@ export default function AtmosphereModal(props: {
               maxHeight: '86vh',
               overflow: 'auto',
               borderRadius: 18,
-              background: 'rgba(20, 22, 35, 0.98)',
+              background: 'rgba(255, 255, 255, 0.98)',
               border: '1px solid var(--border)',
-              boxShadow: '0 40px 120px rgba(0,0,0,0.55)',
+              boxShadow: '0 40px 120px rgba(2,6,23,0.15)',
               padding: 14,
             }}
           >
@@ -106,7 +106,7 @@ export default function AtmosphereModal(props: {
                 style={{
                   borderRadius: 16,
                   border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.02)',
+                  background: 'rgba(255,255,255,0.75)',
                   padding: 14,
                 }}
               >
@@ -142,7 +142,7 @@ export default function AtmosphereModal(props: {
                 style={{
                   borderRadius: 16,
                   border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.02)',
+                  background: 'rgba(255,255,255,0.75)',
                   padding: 14,
                 }}
               >

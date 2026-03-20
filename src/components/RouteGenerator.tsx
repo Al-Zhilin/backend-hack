@@ -183,7 +183,7 @@ export default function RouteGenerator(props: { profile: AuthProfile; onPickRout
               borderRadius: 16,
               padding: 14,
               marginTop: 12,
-              background: 'rgba(255,255,255,0.02)',
+              background: 'rgba(255,255,255,0.85)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
@@ -236,7 +236,7 @@ export default function RouteGenerator(props: { profile: AuthProfile; onPickRout
                       padding: 12,
                       borderRadius: 14,
                       border: '1px solid rgba(255,255,255,0.08)',
-                      background: 'rgba(255,255,255,0.02)',
+                      background: 'rgba(255,255,255,0.85)',
                       marginTop: 10,
                     }}
                   >

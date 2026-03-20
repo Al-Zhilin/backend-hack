@@ -17,10 +17,11 @@ export function createPanoramaTexture(opts: { title: string; subtitle?: string }
 
   // Фон “пейзаж” через градиенты
   const bg = ctx.createLinearGradient(0, 0, w, h)
-  bg.addColorStop(0, '#0ea5e9')
-  bg.addColorStop(0.35, '#22c55e')
-  bg.addColorStop(0.7, '#7c3aed')
-  bg.addColorStop(1, '#0b0f1a')
+  // Тёплый зелёно-жёлтый градиент (без синего/фиолетового).
+  bg.addColorStop(0, '#facc15')
+  bg.addColorStop(0.3, '#22c55e')
+  bg.addColorStop(0.7, '#16a34a')
+  bg.addColorStop(1, '#064e3b')
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, w, h)
 

@@ -39,7 +39,7 @@ export default function TripsPage() {
                 borderRadius: 16,
                 padding: 14,
                 marginTop: 12,
-                background: 'rgba(255,255,255,0.02)',
+              background: 'rgba(255,255,255,0.85)',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
