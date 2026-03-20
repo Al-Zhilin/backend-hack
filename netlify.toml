@@ -3,11 +3,6 @@
   publish = "dist"
 
 [[headers]]
-  for = "/*"
-  [headers.values]
-    Content-Type = "application/javascript; charset=utf-8"
-
-[[headers]]
   for = "/assets/*.js"
   [headers.values]
     Content-Type = "application/javascript; charset=utf-8"
@@ -16,6 +11,13 @@
   for = "/assets/*.css"
   [headers.values]
     Content-Type = "text/css; charset=utf-8"
+
+# Для favicon, изображений, json и т.д. обычно не нужно ничего — Netlify сам правильно определяет
+# Но если очень хочется, можно добавить:
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"   # полезно для безопасности, но не трогает Content-Type
 
 [[redirects]]
   from = "/*"
