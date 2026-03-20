@@ -87,6 +87,6 @@ TOURS_DATA = {
   ]
 }
 
-@app.get("/")
+@app.post("/")
 def root():
     return TOURS_DATA
