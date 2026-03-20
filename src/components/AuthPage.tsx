@@ -82,13 +82,13 @@ export default function AuthPage(props: { onDone: (profile: AuthProfile) => void
     if (stage === 'wizard') return 'Опрос интересов'
     if (stage === 'auth') return 'Регистрация / вход'
     if (stage === 'partnerDone') return 'Профиль партнёра'
-    return 'Выберите сценарий'
+    return ''
   }, [stage])
 
   return (
     <div className="authWrap">
       <div className="authHeader">
-        <div className="authLogo">KubanHidden</div>
+        <div className="authLogo">Кубань.Смотри!</div>
         <div className="authHeaderTitle">{title}</div>
       </div>
 

@@ -81,7 +81,7 @@ export default function App() {
       <div className="appShell">
         <aside className="sidebar" aria-label="Навигация">
           <div className="sidebarBrand" onClick={() => navigate('/map')} role="button" tabIndex={0}>
-            КубанHidden
+            Кубань.Смотри!
           </div>
 
           <div className="sidebarNav">
@@ -126,7 +126,7 @@ export default function App() {
               Меню
             </button>
             <div className="mobileBrand" onClick={() => navigate('/map')} role="button" tabIndex={0}>
-              КубанHidden
+              Кубань.Смотри!
             </div>
           </header>
 

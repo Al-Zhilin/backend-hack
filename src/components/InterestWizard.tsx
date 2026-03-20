@@ -242,7 +242,6 @@ export default function InterestWizard(props: { onComplete: (interests: Interest
           {step === 6 && (
             <div className="wizardStep">
               <h2 className="wizardTitle">Как к вам обращаться?</h2>
-              <p className="wizardHint">Мы используем это в подсказках к маршруту.</p>
               <label className="field">
                 <span className="label">Имя</span>
                 <input
