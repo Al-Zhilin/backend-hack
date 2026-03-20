@@ -17,6 +17,7 @@ const SEASON_OPTIONS: Array<{ id: SeasonId; label: string }> = [
   { id: 'any', label: 'Любой' },
 ]
 
+
 function getById(id: string, locations: Location[]) {
   return locations.find((l) => l.id === id) ?? null
 }
