@@ -1,0 +1,168 @@
+@use './variables.scss' as *;
+
+.appShell {
+  display: flex;
+  height: 100svh;
+  width: 100%;
+}
+
+.sidebar {
+  width: 280px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-right: 1px solid var(--border);
+  display: none;
+  flex-direction: column;
+}
+
+@media (min-width: 980px) {
+  .sidebar {
+    display: flex;
+  }
+}
+
+.sidebarBrand {
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  padding: 12px 12px 10px;
+  border-radius: $radius-md;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebarNav {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebarDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 0;
+}
+
+.sidebarFooter {
+  margin-top: auto;
+}
+
+.navItem {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.navItem:hover {
+  border-color: rgba(170, 59, 255, 0.5);
+  background: rgba(170, 59, 255, 0.08);
+}
+
+.navItem.active {
+  border-color: rgba(170, 59, 255, 0.65);
+  background: rgba(170, 59, 255, 0.12);
+}
+
+.contentArea {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.page {
+  padding: 22px;
+  max-width: $container-max;
+  margin: 0 auto;
+  overflow: auto;
+}
+
+.primaryBtn {
+  margin-top: 14px;
+  background: rgba(170, 59, 255, 0.18);
+  border: 1px solid rgba(170, 59, 255, 0.55);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: $radius-md;
+  cursor: pointer;
+}
+
+.mobileTopbar {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+@media (min-width: 980px) {
+  .mobileTopbar {
+    display: none;
+  }
+}
+
+.burger {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  border-radius: $radius-md;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.mobileBrand {
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+
+// Drawer
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.drawerOverlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: fixed;
+  top: 58px;
+  left: 0;
+  width: min(86vw, 320px);
+  height: calc(100svh - 58px);
+  background: rgba(20, 22, 35, 0.96);
+  border-right: 1px solid var(--border);
+  transform: translateX(-104%);
+  transition: transform 0.25s;
+  z-index: 30;
+  padding: 12px;
+}
+
+.drawer.open {
+  transform: translateX(0);
+}
+
+.drawerInner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+

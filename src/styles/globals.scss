@@ -1,0 +1,54 @@
+@use './variables.scss' as *;
+@use './auth.scss' as *;
+
+:root {
+  color-scheme: dark;
+  --bg: #{$color-bg};
+  --surface: #{$color-surface};
+  --text: #{$color-text};
+  --muted: #{$color-muted};
+  --border: #{$color-border};
+  --accent: #{$color-accent};
+  --accent-2: #{$color-accent-2};
+  --radius-lg: #{$radius-lg};
+  --radius-md: #{$radius-md};
+  --radius-sm: #{$radius-sm};
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  line-height: 1.45;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.appContainer {
+  max-width: #{$container-max};
+  margin: 0 auto;
+  padding: 0 16px;
+}
+

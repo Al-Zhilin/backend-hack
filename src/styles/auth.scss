@@ -1,0 +1,288 @@
+@use './variables.scss' as *;
+
+.authWrap {
+  height: 100svh;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.authHeader {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.authLogo {
+  font-weight: 900;
+  letter-spacing: -0.4px;
+}
+
+.authHeaderTitle {
+  opacity: 0.85;
+  font-weight: 600;
+}
+
+.authGrid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 14px;
+  padding: 14px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+@media (max-width: 980px) {
+  .authGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.authLeft {
+  min-height: 560px;
+}
+
+.authRight {
+  padding: 14px;
+}
+
+.landingHero {
+  border-radius: $radius-lg;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  min-height: 560px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.landingContent {
+  position: absolute;
+  inset: 0;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.75));
+}
+
+.landingTitle {
+  font-size: 46px;
+  margin: 0 0 10px;
+}
+
+.landingSubtitle {
+  margin: 0;
+  max-width: 520px;
+  opacity: 0.92;
+}
+
+.roleChoice {
+  padding: 10px;
+}
+
+.sectionTitle {
+  margin: 0 0 14px;
+  font-size: 22px;
+}
+
+.roleGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.roleCard {
+  border-radius: $radius-lg;
+  padding: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+
+.roleCard:hover {
+  transform: translateY(-2px);
+  border-color: rgba(170, 59, 255, 0.6);
+  background: rgba(170, 59, 255, 0.08);
+}
+
+.roleTitle {
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.roleDesc {
+  opacity: 0.85;
+}
+
+.authForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+.input {
+  border-radius: $radius-md;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px 12px;
+  color: var(--text);
+  outline: none;
+}
+
+.input:focus {
+  border-color: rgba(170, 59, 255, 0.65);
+}
+
+.formError {
+  color: #fca5a5;
+  margin-top: 8px;
+}
+
+.formHint {
+  font-size: 14px;
+  opacity: 0.75;
+}
+
+.full {
+  width: 100%;
+}
+
+// Wizard
+.wizard {
+  padding: 10px 6px;
+}
+
+.wizardTop {
+  margin-bottom: 14px;
+}
+
+.wizardProgressLabel {
+  font-weight: 800;
+  opacity: 0.92;
+}
+
+.wizardProgressBar {
+  height: 10px;
+  border-radius: $radius-md;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.wizardProgressFill {
+  height: 100%;
+  background: rgba(170, 59, 255, 0.7);
+  border-radius: $radius-md;
+}
+
+.wizardTitle {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+
+.wizardHint {
+  margin: -2px 0 14px;
+  opacity: 0.8;
+}
+
+.choiceGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.choiceGrid2 {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 520px) {
+  .choiceGrid2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.choice {
+  border-radius: $radius-md;
+  padding: 12px 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, background 0.12s;
+  text-align: left;
+}
+
+.choice:hover {
+  transform: translateY(-1px);
+  border-color: rgba(170, 59, 255, 0.5);
+}
+
+.choice.checked {
+  border-color: rgba(170, 59, 255, 0.75);
+  background: rgba(170, 59, 255, 0.12);
+}
+
+.choiceRadio {
+  text-align: left;
+}
+
+.choiceStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wizardActions {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.secondaryBtn {
+  border-radius: $radius-md;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.secondaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primaryBtn {
+  border-radius: $radius-md;
+  padding: 10px 14px;
+  border: 1px solid rgba(170, 59, 255, 0.55);
+  background: rgba(170, 59, 255, 0.18);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

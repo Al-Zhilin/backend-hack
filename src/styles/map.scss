@@ -1,0 +1,235 @@
+.mapShell {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+.mapOverlayLeft {
+  position: absolute;
+  z-index: 20;
+  top: 12px;
+  left: 12px;
+  width: min(420px, calc(100vw - 24px));
+  pointer-events: auto;
+}
+
+.filtersCard {
+  background: rgba(20, 22, 35, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.filtersTitle {
+  font-weight: 900;
+  opacity: 0.95;
+  margin-bottom: 10px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 999px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+  font-weight: 650;
+  font-size: 13px;
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(170, 59, 255, 0.55);
+}
+
+.chip.active {
+  border-color: rgba(170, 59, 255, 0.75);
+  background: rgba(170, 59, 255, 0.12);
+}
+
+.chip.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mapOverlayRightTop {
+  position: absolute;
+  z-index: 20;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  pointer-events: auto;
+}
+
+.sidePanel {
+  position: absolute;
+  z-index: 40;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: min(440px, 100vw);
+  background: rgba(20, 22, 35, 0.98);
+  border-left: 1px solid var(--border);
+  box-shadow: -30px 0 70px rgba(0, 0, 0, 0.45);
+  padding: 14px;
+  overflow: auto;
+}
+
+.sidePanelTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.iconBtn {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.photoSlider {
+  margin-top: 12px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.photoSliderImg {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.sliderControls {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.sliderPill {
+  opacity: 0.75;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.placeDesc {
+  margin-top: 10px;
+  opacity: 0.9;
+  line-height: 1.35;
+}
+
+.tagsRow {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tagBadge {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 750;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  opacity: 0.95;
+}
+
+.tagBadge.matched {
+  border-color: rgba(34, 197, 94, 0.65);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.panelActions {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.secondaryBtnWide {
+  width: 100%;
+}
+
+.timelineOverlay {
+  position: absolute;
+  z-index: 20;
+  left: 12px;
+  bottom: 12px;
+  width: min(680px, calc(100vw - 24px));
+  pointer-events: auto;
+}
+
+.timelineCard {
+  background: rgba(20, 22, 35, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+.timelineTitle {
+  font-weight: 900;
+  opacity: 0.95;
+  margin-bottom: 8px;
+}
+
+.timelineItems {
+  display: flex;
+  gap: 10px;
+  overflow: auto;
+  padding-bottom: 4px;
+}
+
+.timelineItem {
+  min-width: 200px;
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.timelineDay {
+  font-weight: 900;
+}
+
+.timelineRoute {
+  opacity: 0.85;
+  margin-top: 5px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+@media (max-width: 520px) {
+  .sidePanel {
+    width: 100vw;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    top: auto;
+    bottom: 0;
+    height: min(70vh, 640px);
+  }
+
+  .photoSliderImg {
+    height: 160px;
+  }
+}
+
