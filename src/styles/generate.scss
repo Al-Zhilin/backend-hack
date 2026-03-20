@@ -1,0 +1,12 @@
+.generateLayout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 1024px) {
+  .generateLayout {
+    grid-template-columns: 1fr;
+  }
+}
+

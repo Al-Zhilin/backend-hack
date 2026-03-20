@@ -6,12 +6,13 @@ import { clearProfile, loadProfile, loadTrips } from './utils/storage'
 
 import AuthPage from './components/AuthPage'
 import InteractiveMap from './components/InteractiveMap'
-import Profile from './components/Profile'
 import VRView from './components/VRView'
 import RouteGenerator from './components/RouteGenerator'
 import Pano360View from './components/Pano360View'
 import TripsPage from './pages/TripsPage'
 import PlacePage from './pages/PlacePage'
+import ProfilePage from './pages/ProfilePage'
+import RecommendationsPage from './pages/RecommendationsPage'
 
 import './styles/layout.scss'
 
@@ -214,21 +215,9 @@ export default function App() {
               {/* Полноэкранный 360° просмотр (без WebXR) */}
               <Route path="/pano" element={<Pano360View />} />
 
-              <Route path="/profile" element={<Profile profile={profile} onUpdate={(p) => setProfile(p)} />} />
+              <Route path="/profile" element={<ProfilePage profile={profile} onUpdate={(p) => setProfile(p)} />} />
 
-              <Route
-                path="/recommendations"
-                element={
-                  <div className="page">
-                    <h2>Рекомендации сезона</h2>
-                    <p>{interests ? `Под ваш сезон: ${interests.season === 'any' ? 'Любой' : interests.season}` : '—'}</p>
-                    <p style={{ opacity: 0.8 }}>Скоро добавим персональные подборки и “быстрые туры”.</p>
-                    <button type="button" className="primaryBtn" onClick={() => navigate('/generate')}>
-                      Сгенерировать тур
-                    </button>
-                  </div>
-                }
-              />
+              <Route path="/recommendations" element={<RecommendationsPage profile={profile} />} />
 
               <Route path="/partner/locations" element={<div className="page">Заглушка: “Мои локации”.</div>} />
               <Route path="/partner/add" element={<div className="page">Заглушка: “Добавить объект”.</div>} />

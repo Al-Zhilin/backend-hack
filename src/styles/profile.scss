@@ -1,0 +1,116 @@
+.profileHeader {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.profileIdentity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(22, 163, 74, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 950;
+  color: var(--text);
+  overflow: hidden;
+}
+
+.profileName {
+  font-weight: 1000;
+  font-size: 20px;
+}
+
+.blockTitle {
+  font-weight: 950;
+  opacity: 0.95;
+  margin-bottom: 10px;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text);
+  font-weight: 750;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tagChip:hover {
+  border-color: rgba(22, 163, 74, 0.55);
+}
+
+.tagChipRemove {
+  opacity: 0.8;
+  font-weight: 950;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 980px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.statCardValue {
+  font-weight: 1000;
+  font-size: 20px;
+  margin-top: 6px;
+}
+
+.toursRow {
+  display: flex;
+  gap: 10px;
+  overflow: auto;
+  padding-bottom: 4px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 980px) {
+  .settingsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.85);
+}
+
+.smallLabel {
+  opacity: 0.85;
+  font-weight: 800;
+}
+
