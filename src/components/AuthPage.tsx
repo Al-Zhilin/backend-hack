@@ -63,9 +63,6 @@ function AuthForm(props: { role: UserRole; onSubmit: (email: string) => void }) 
       <button type="submit" className="primaryBtn full">
         {props.role === 'traveler' ? 'Начать как путешественник' : 'Создать профиль партнёра'}
       </button>
-      <div className="formHint">
-        Никакого бэкенда: профиль сохраняется в <code>localStorage</code>.
-      </div>
     </form>
   )
 }
