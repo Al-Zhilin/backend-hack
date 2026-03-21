@@ -1,4 +1,6 @@
 import httpx
+import database
+import gisapi
 from fastapi import FastAPI, Request, Response, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
@@ -8,13 +10,11 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from bson import ObjectId
 from datetime import datetime, timezone
-
-import database
-import gisapi
 from loader import BASE_LOCAL_URL
 
 app = FastAPI(title="Transit & Tour Master")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
 
 STATIC_DIR = Path(__file__).parent / "static"
 

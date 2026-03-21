@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from loader import MONGO_URI, DB_NAME
 
-class MongoDB:git
+class MongoDB:
     client: AsyncIOMotorClient = None
     db = None
 

@@ -9,7 +9,7 @@ YANDEX_RASP_KEY = os.getenv("YANDEX_RASP_API_KEY")
 DGIS_KEY = os.getenv("DGis_API_KEY")
 
 # Настройки сервера друга
-BASE_LOCAL_URL = "https://ratable-convalescently-epifania.ngrok-free.dev"
+BASE_LOCAL_URL = os.getenv("BASE_OF_LOCAL_URL")
 
 # MongoDB
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://...")

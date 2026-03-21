@@ -9,6 +9,5 @@ fastapi==0.115.0
 httpx==0.28.1
 dotenv==0.9.9
 python-dotenv==1.2.2
-motor
-pydantic
+motor==3.3.2
 pymongo[srv]
