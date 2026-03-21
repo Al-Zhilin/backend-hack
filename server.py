@@ -26,7 +26,7 @@ async def shutdown():
 # --- СХЕМЫ ---
 class ChatRequest(BaseModel):
     login: str = Field(..., example="user123")
-    message: str = Field(..., example="Я хочу погулять пешком по Москве, люблю музеи.")
+    text: str = Field(..., example="Я хочу погулять пешком по Москве, люблю музеи.")
 
 
 class CollectedTags(BaseModel):
