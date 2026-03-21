@@ -11,4 +11,6 @@ dotenv==0.9.9
 python-dotenv==1.2.2
 pymongo>=4.0
 motor>=3.3.0
-dnspython pymongo[srv] motor
+dnspython
+pymongo[srv]
+motor
