@@ -156,7 +156,7 @@ async def build_selected_route_background(data: GenerateRouteRequest):
 
 @app.post("/api/generate_route")
 async def generate_route_endpoint(data: GenerateRouteRequest, background_tasks: BackgroundTasks):
-    if not data.selected_places:
+    if not data.suggested_places:
         return JSONResponse(status_code=400, content={"message": "Вы не выбрали ни одного места!"})
 
     # Запускаем сборку маршрута в фоне
