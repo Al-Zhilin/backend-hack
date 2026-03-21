@@ -22,8 +22,7 @@ function Landing() {
       <div className="landingContent">
         <h1 className="landingTitle">KubanHidden</h1>
         <p className="landingSubtitle">
-          Генератор персонализированных туров по Краснодарскому краю: интерактивная карта, “дистанционные визиты” и
-          VR-режим.
+          Генератор персонализированных туров по Краснодарскому краю: интерактивная карта и “дистанционные визиты”
         </p>
       </div>
     </div>

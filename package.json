@@ -20,9 +20,12 @@
     "@pbe/react-yandex-maps": "^1.2.5",
     "@react-three/drei": "^9.88.0",
     "@react-three/fiber": "^8.15.0",
+    "@types/leaflet": "^1.9.21",
     "framer-motion": "^10.16.0",
+    "leaflet": "^1.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.20.0",
     "sass": "^1.69.0",
     "three": "^0.162.0"

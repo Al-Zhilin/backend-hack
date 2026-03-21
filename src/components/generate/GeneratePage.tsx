@@ -172,8 +172,9 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
               <div style={{ fontWeight: 900 }}>Реалистичный маршрут по дорогам</div>
               <label className="field" style={{ width: 180 }}>
                 <select className="input" value={routeMode} onChange={(e) => setRouteMode(e.target.value as 'auto' | 'pedestrian')}>
-                  <option value="auto">Режим: car</option>
-                  <option value="pedestrian">Режим: pedestrian</option>
+                  <option value="auto">Режим: машина</option>
+                  <option value="pedestrian">Режим: пешеход</option>
+                  <option value="bike">Режим: велосипед</option>
                 </select>
               </label>
             </div>

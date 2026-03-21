@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+
+import { geoService } from '../services/geoapify.ts';
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { Clusterer, Map as YMap, Placemark, Polyline, TrafficControl, YMaps } from '@pbe/react-yandex-maps'
 import { useNavigate } from 'react-router-dom'
 import type { AuthProfile } from '../types'
 import type { Location } from '../data/locations'
-import { LOCATIONS } from '../data/locations'
+import { useRealLocations } from '../hooks/useRealLocations'
 import { pickRoutePlaceIds } from '../utils/scoring'
 import { buildInterestsFromTagChips, filterLocationsByTagChips, getAvailableTagChips, type TagChipId } from '../utils/tagChips'
 
@@ -26,6 +28,8 @@ function getById(id: string, locations: Location[]) {
   return locations.find((l) => l.id === id) ?? null
 }
 
+
+
 function buildTimeline(placeIds: string[], locations: Location[], interests: NonNullable<AuthProfile['interests']>, days: number): TimelineItem[] {
   const timeline: TimelineItem[] = []
   for (let day = 0; day < days; day++) {
@@ -35,11 +39,11 @@ function buildTimeline(placeIds: string[], locations: Location[], interests: Non
 
     const transport =
       interests.activityLevel === 'high' || from.activity === 'high' || to.activity === 'high' ? 'Минивэн + тропа' : 'Комфортный трансфер'
-    const stay = interests.activityLevel === 'high' ? 'Гостевой дом / домик в природе (заглушка)' : 'Эко-гостевой дом (заглушка)'
+    const stay = interests.activityLevel === 'high' ? 'Гостевой дом / домик в природе' : 'Эко-гостевой дом'
     const food =
       from.vacationTypes.includes('gastro') || to.vacationTypes.includes('gastro') || from.placeTypes.includes('festivals')
-        ? 'Локальная кухня + дегустации (заглушка)'
-        : 'Питание по маршруту (заглушка)'
+        ? 'Локальная кухня + дегустации'
+        : 'Питание по маршруту'
 
     timeline.push({
       day: day + 1,
@@ -57,84 +61,81 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   const navigate = useNavigate()
   const interests = props.profile.interests
 
-  // Чипы фильтров (multi-select)
+  // 1. ИНИЦИАЛИЗАЦИЯ ДАННЫХ (ВСЕ ХУКИ В НАЧАЛЕ)
+  const { locations: realLocations, loading, error } = useRealLocations()
+  
   const [selectedTags, setSelectedTags] = useState<TagChipId[]>([])
-
-  // Маркер/панель выбранного места
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
-
-  // Модалка “Окунуться…”
   const [atmosphereOpen, setAtmosphereOpen] = useState(false)
-
-  // Длина маршрута (в точках = days + 1)
   const routePlaceCount = props.initialRoutePlaceIds?.length ?? 5
-
   const [routePlaceIds, setRoutePlaceIds] = useState<string[]>(() => props.initialRoutePlaceIds ?? [])
 
-  // В момент первого монтирования (если маршрут не задан) сгенерируем его локально.
+  // 2. ЭФФЕКТЫ ДЛЯ ФОРМИРОВАНИЯ МАРШРУТА
   useEffect(() => {
-    if (!interests) return
-
-    // Если маршрут пришёл из генератора — не перегенерируем без причины.
+    // Если еще грузимся или данных нет — ничего не делаем, но хук зарегистрирован!
+    if (loading || !interests || realLocations.length === 0) return
     if (props.initialRoutePlaceIds?.length) return
 
-    const candidates = filterLocationsByTagChips(LOCATIONS, selectedTags)
+    const candidates = filterLocationsByTagChips(realLocations, selectedTags)
     const nextInterests = buildInterestsFromTagChips(interests, selectedTags)
     const picked = pickRoutePlaceIds(candidates, nextInterests, routePlaceCount)
     if (picked.length) setRoutePlaceIds(picked)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [realLocations, interests, props.initialRoutePlaceIds, selectedTags, routePlaceCount, loading])
 
-  // При смене фильтров пересобираем маршрут (только видимые точки).
   useEffect(() => {
-    if (!interests) return
-
-    // Если маршрут пришёл из генератора и пользователь ещё не выбрал фильтры,
-    // сохраняем порядок точек как есть (иначе UX “прыгает”).
+    if (loading || !interests || realLocations.length === 0) return
     if (props.initialRoutePlaceIds?.length && selectedTags.length === 0) return
 
-    const candidates = filterLocationsByTagChips(LOCATIONS, selectedTags)
+    const candidates = filterLocationsByTagChips(realLocations, selectedTags)
     const nextInterests = buildInterestsFromTagChips(interests, selectedTags)
     const picked = pickRoutePlaceIds(candidates, nextInterests, routePlaceCount)
     if (picked.length) setRoutePlaceIds(picked)
-  }, [selectedTags, interests, routePlaceCount])
+  }, [selectedTags, interests, routePlaceCount, realLocations, props.initialRoutePlaceIds?.length, loading])
 
+  // 3. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ (MEMO)
   const availableChips = useMemo(() => {
     if (!interests) return []
     return getAvailableTagChips(interests)
   }, [interests])
 
-  const visibleLocations = useMemo(() => filterLocationsByTagChips(LOCATIONS, selectedTags), [selectedTags])
+  const visibleLocations = useMemo(() => {
+    if (loading) return []
+    return filterLocationsByTagChips(realLocations, selectedTags)
+  }, [realLocations, selectedTags, loading])
 
   const mapCenter = useMemo(() => {
-    if (!visibleLocations.length) return [44.7, 37.0]
+    if (!visibleLocations.length) return [44.7, 37.0] as [number, number]
     const avgLat = visibleLocations.reduce((s, l) => s + l.lat, 0) / visibleLocations.length
     const avgLng = visibleLocations.reduce((s, l) => s + l.lng, 0) / visibleLocations.length
     return [avgLat, avgLng] as [number, number]
   }, [visibleLocations])
 
   const routeLocations = useMemo(() => {
-    return routePlaceIds.map((id) => getById(id, LOCATIONS)).filter(Boolean) as Location[]
-  }, [routePlaceIds])
+    if (loading) return []
+    return routePlaceIds.map((id) => getById(id, realLocations)).filter(Boolean) as Location[]
+  }, [routePlaceIds, realLocations, loading])
 
   const routeDays = Math.max(1, routePlaceIds.length - 1)
+  
   const timeline = useMemo(() => {
-    if (!interests) return []
-    return buildTimeline(routePlaceIds, LOCATIONS, interests, routeDays)
-  }, [routePlaceIds, interests, routeDays])
+    if (!interests || loading || realLocations.length === 0) return []
+    return buildTimeline(routePlaceIds, realLocations, interests, routeDays)
+  }, [routePlaceIds, interests, routeDays, realLocations, loading])
 
   const selectedPlace = useMemo(() => {
-    if (!selectedPlaceId) return null
-    return LOCATIONS.find((l) => l.id === selectedPlaceId) ?? null
-  }, [selectedPlaceId])
+    if (!selectedPlaceId || loading) return null
+    return realLocations.find((l) => l.id === selectedPlaceId) ?? null
+  }, [selectedPlaceId, realLocations, loading])
 
   const routeSet = useMemo(() => new Set(routePlaceIds), [routePlaceIds])
-  const clusterLocations = useMemo(() => visibleLocations.filter((l) => !routeSet.has(l.id)), [visibleLocations, routeSet])
+  
+  const clusterLocations = useMemo(() => {
+    return visibleLocations.filter((l) => !routeSet.has(l.id))
+  }, [visibleLocations, routeSet])
 
-  // В yandex-maps wrapper нет “onClick” как у обычных компонентов — навешиваем обработчик через instanceRef.
   const onPlacemarkInstanceRef = (placeId: string) => {
     return (inst: any) => {
       if (!inst) return
-      // Добавляем слушатель только один раз на инстанс.
       if (inst.__kubanClickAttached) return
       inst.__kubanClickAttached = true
       inst.events?.add?.('click', () => {
@@ -143,18 +144,62 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
     }
   }
 
+  // 4. УСЛОВНЫЕ ВОЗВРАТЫ ДЛЯ ЭКРАНОВ ЗАГРУЗКИ И ОШИБОК (ПОСЛЕ ВСЕХ ХУКОВ)
+  if (loading) {
+    return (
+      <div className="mapShell">
+        <div className="loadingContainer">
+          <div className="spinner"></div>
+          <h3>Загрузка реальных мест Краснодарского края...</h3>
+          <p>Ищем достопримечательности, винодельни и природные объекты</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="mapShell">
+        <div className="errorContainer">
+          <h3>⚠️ Ошибка загрузки мест</h3>
+          <p>{error}</p>
+          <button className="primaryBtn" onClick={() => window.location.reload()}>Повторить попытку</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!realLocations.length && !loading) {
+    return (
+      <div className="mapShell">
+        <div className="errorContainer">
+          <h3>📍 Места не найдены</h3>
+          <p>Не удалось найти места в Краснодарском крае. Попробуйте позже.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 5. ОСНОВНОЙ РЕНДЕР
   return (
     <div className="mapShell">
       {!interests ? (
         <div className="page">
           <h2>Настройте интересы</h2>
-          <p style={{ opacity: 0.85, marginTop: 10 }}>Чтобы карта фильтров работала и маршруты собирались — заполните опрос в профиле.</p>
+          <p style={{ opacity: 0.85, marginTop: 10 }}>
+            Чтобы карта фильтров работала и маршруты собирались — заполните опрос в профиле.
+          </p>
         </div>
       ) : (
         <>
           <div className="mapOverlayLeft">
             <div className="card filtersCard">
-              <div className="filtersTitle">Фильтры по тегам</div>
+              <div className="filtersTitle">
+                Фильтры по тегам
+                <span style={{ fontSize: 12, marginLeft: 8, color: '#666' }}>
+                  ({visibleLocations.length} из {realLocations.length} мест)
+                </span>
+              </div>
               <div className="chips" role="group" aria-label="Теги фильтра">
                 {availableChips.map((chip) => {
                   const active = selectedTags.includes(chip.id)
@@ -169,21 +214,15 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                       }}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          setSelectedTags((prev) => (prev.includes(chip.id) ? prev.filter((x) => x !== chip.id) : [...prev, chip.id]))
-                        }
-                      }}
                     >
                       {chip.label}
                     </div>
                   )
                 })}
-                {availableChips.length === 0 && <div style={{ opacity: 0.75 }}>Чипы пока не сформированы (нет интересов).</div>}
               </div>
 
               <div style={{ opacity: 0.75, marginTop: 10, fontWeight: 700 }}>
-                Точек на карте: {visibleLocations.length}. Маршрут пересобирается при выборе фильтров.
+                🌍 Загружено из Geoapify: {realLocations.length}
               </div>
 
               {selectedTags.length > 0 && (
@@ -203,15 +242,6 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
             <button type="button" className="primaryBtn" onClick={() => navigate('/generate')}>
               Сгенерировать тур
             </button>
-            <button
-              type="button"
-              className="secondaryBtn"
-              onClick={() => {
-                alert('MVP: Экспорт в PDF будет добавлен следующим шагом.');
-              }}
-            >
-              Экспорт в PDF
-            </button>
           </div>
 
           <YMaps query={YANDEX_MAPS_QUERY} preload>
@@ -223,18 +253,8 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
             >
               <TrafficControl />
 
-              {routeLocations.length >= 2 && (
-                <Polyline
-                  geometry={routeLocations.map((l) => [l.lat, l.lng])}
-                  options={{
-                    strokeColor: 'rgba(22, 163, 74, 0.85)',
-                    strokeWidth: 5,
-                    strokeOpacity: 0.9,
-                  }}
-                />
-              )}
+              {routeLocations.length >= 2 && <SmartRoute locations={routeLocations} />}
 
-              {/* Все “обычные” точки (кластеры), кроме точек маршрута */}
               {clusterLocations.length > 0 && (
                 <Clusterer options={{ preset: 'islands#greenIcon', groupByCoordinates: false }}>
                   {clusterLocations.map((loc) => (
@@ -248,14 +268,11 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                 </Clusterer>
               )}
 
-              {/* Точки маршрута: отдельные маркеры дней поверх кластера */}
               {routeLocations.map((loc, idx) => (
                 <Placemark
                   key={`${loc.id}_route_${idx}`}
                   geometry={[loc.lat, loc.lng]}
-                  options={{
-                    preset: idx === 0 ? 'islands#greenIcon' : 'islands#greenIcon',
-                  }}
+                  options={{ preset: 'islands#greenIcon' }}
                   properties={{
                     iconContent: `<div style="color:#ffffff;font-weight:900;">${idx + 1}</div>`,
                   }}
@@ -265,7 +282,6 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
             </YMap>
           </YMaps>
 
-          {/* Таймлайн поверх карты */}
           <div className="timelineOverlay">
             <div className="card timelineCard">
               <div className="timelineTitle">Таймлайн маршрута</div>
@@ -274,13 +290,13 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                   <div className="timelineItem" key={`${t.day}_${t.fromPlaceId}_${t.toPlaceId}`}>
                     <div className="timelineDay">День {t.day}</div>
                     <div className="timelineRoute">
-                      {(LOCATIONS.find((l) => l.id === t.fromPlaceId)?.name ?? t.fromPlaceId) + ' → '}
-                      {LOCATIONS.find((l) => l.id === t.toPlaceId)?.name ?? t.toPlaceId}
+                      {(realLocations.find((l) => l.id === t.fromPlaceId)?.name ?? t.fromPlaceId) + ' → '}
+                      {realLocations.find((l) => l.id === t.toPlaceId)?.name ?? t.toPlaceId}
                     </div>
                     <div style={{ opacity: 0.8, marginTop: 8, fontSize: 13, lineHeight: 1.25 }}>
-                      <div>Транспорт: {t.transport}</div>
-                      <div>Жилье: {t.stay}</div>
-                      <div>Питание: {t.food}</div>
+                      <div>🚗 {t.transport}</div>
+                      <div>🏠 {t.stay}</div>
+                      <div>🍽️ {t.food}</div>
                     </div>
                   </div>
                 ))}
@@ -307,3 +323,41 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   )
 }
 
+function SmartRoute({ locations }: { locations: Location[] }) {
+  const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
+
+  useEffect(() => {
+    if (locations.length < 2) return;
+  
+    geoService.getRoute(locations.map(l => ({ lat: l.lat, lng: l.lng })))
+      .then(data => {
+        // Продвинутая обработка: склеиваем все части пути в один массив
+        // Geoapify может вернуть несколько сегментов в зависимости от типа пути
+        const features = data.features[0];
+        let rawCoords = [];
+        
+        if (features.geometry.type === 'LineString') {
+          rawCoords = features.geometry.coordinates;
+        } else if (features.geometry.type === 'MultiLineString') {
+          rawCoords = features.geometry.coordinates.flat();
+        }
+  
+        const coords = rawCoords.map((c: number[]) => [c[1], c[0]] as [number, number]);
+        setRouteGeometry(coords);
+      })
+      .catch(err => console.error("Маршрут не построился:", err));
+  }, [locations]);
+
+  if (routeGeometry.length === 0) return null;
+
+  return (
+    <Polyline
+      geometry={routeGeometry}
+      options={{
+        strokeColor: '#16a34a',
+        strokeWidth: 5,
+        strokeOpacity: 0.8,
+      }}
+    />
+  );
+}
