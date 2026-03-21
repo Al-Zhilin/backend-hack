@@ -24,6 +24,12 @@ async def shutdown():
 
 
 # --- СХЕМЫ ---
+class SuggestedTourData(BaseModel):
+    login: str
+    start_point: dict
+    transport_mode: str
+    suggested_places: List[dict]
+
 class PlaceItem(BaseModel):
     id: str = Field(..., description="ID из 2GIS или сгенерированный")
     name: str
@@ -58,32 +64,65 @@ class TourCollectedData(BaseModel):
     collected_tags: CollectedTags
 
 # --- ЭНДПОИНТЫ ---
-@app.post("/api/search_places")
-async def search_places_for_user(data: TourCollectedData):
-    print(f"📍 Ищу места для пользователя {data.login}...")
-    tags = data.collected_tags
+# 1. ЭНДПОИНТ ДЛЯ НЕЙРОСЕТИ (Webhook)
+@app.post("/api/receive_tour_data")
+async def receive_webhook(data: TourCollectedData, background_tasks: BackgroundTasks):
+    """
+    Нейросеть отправляет сюда теги. Мы переделываем логику:
+    вместо генерации всего маршрута, мы только ищем места и кладем их в буфер для Фронтенда.
+    """
 
-    # 1. Получаем координаты старта
-    start_point = await gisapi.GISService.get_coordinates_yandex(tags.start_location)
-    if not start_point:
-        start_point = {"name": tags.start_location + " (Координаты по умолчанию)", "lat": 55.749, "lon": 37.539}
+    async def process_tags_to_places(data: TourCollectedData):
+        db = await database.get_db()
+        tags = data.collected_tags
 
-    # 2. Ищем места по тегам
-    places = await gisapi.GISService.get_places_by_tags(
-        start_point["lat"],
-        start_point["lon"],
-        tags.categories
-    )
+        # 1. Ищем старт
+        start_point = await gisapi.GISService.get_coordinates_yandex(tags.start_location)
+        if not start_point:
+            start_point = {"name": tags.start_location, "lat": 55.75, "lon": 37.62}
 
-    print(f"✅ Найдено мест: {len(places)}. Отправляю на фронтенд для выбора.")
+        # 2. Ищем места в 2ГИС
+        places = await gisapi.GISService.get_places_by_tags(
+            start_point["lat"], start_point["lon"], tags.categories
+        )
 
-    # Отправляем данные клиенту
-    return {
-        "login": data.login,
-        "transport_mode": tags.transport_mode,
-        "start_point": start_point,
-        "suggested_places": places
-    }
+        # 3. Сохраняем в коллекцию 'suggestions', чтобы Фронтенд мог их забрать!
+        await db["suggestions"].update_one(
+            {"login": data.login},
+            {"$set": {
+                "login": data.login,
+                "start_point": start_point,
+                "transport_mode": tags.transport_mode,
+                "suggested_places": places
+            }},
+            upsert=True
+        )
+
+    # Запускаем в фоне, чтобы нейросеть сразу получила ответ "ок"
+    background_tasks.add_task(process_tags_to_places, data)
+    return {"status": "success", "message": "Теги приняты. Ищу места для фронтенда."}
+
+@app.get("/api/get_suggestions/{login}")
+async def get_suggestions(login: str):
+    """
+    Фронтенд вызывает этот роут, чтобы проверить,
+    подготовил ли сервер места на основе тегов от ИИ.
+    """
+    db = await database.get_db()
+    if db is None:
+        return JSONResponse(status_code=503, content={"message": "БД недоступна"})
+
+    suggestion = await db["suggestions"].find_one({"login": login}, {"_id": 0})
+
+    if not suggestion:
+        return JSONResponse(status_code=404, content={"message": "Места еще подбираются..."})
+
+    return suggestion
+
+@app.post("/api/generate_route")
+async def generate_route_endpoint(data: GenerateRouteRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(build_selected_route_background, data)
+    return {"status": "success", "message": "Маршрут оптимизируется..."}
 
 @app.post("/api/chat")
 async def proxy_chat(data: ChatRequest):
