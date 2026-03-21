@@ -1,6 +1,6 @@
 
 import { geoService } from '../services/geoapify.ts';
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback  } from 'react'
 import { Clusterer, Map as YMap, Placemark, Polyline, TrafficControl, YMaps } from '@pbe/react-yandex-maps'
 import { useNavigate } from 'react-router-dom'
 import type { AuthProfile } from '../types'
@@ -62,7 +62,8 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   const interests = props.profile.interests
 
   // 1. ИНИЦИАЛИЗАЦИЯ ДАННЫХ (ВСЕ ХУКИ В НАЧАЛЕ)
-  const { locations: realLocations, loading, error } = useRealLocations()
+  const { locations: realLocations, loading, error } = useRealLocations();
+  const [allPlaces, setAllPlaces] = useState<Location[]>([]);
   
   const [selectedTags, setSelectedTags] = useState<TagChipId[]>([])
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
@@ -143,6 +144,29 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
       })
     }
   }
+  const debouncedBoundsChange = useRef<any>();
+  const handleBoundsChange = useCallback((event: any) => {
+    if (debouncedBoundsChange.current) {
+      clearTimeout(debouncedBoundsChange.current);
+    }
+    
+    debouncedBoundsChange.current = setTimeout(async () => {
+      const map = event.get('target');
+      const bounds = map.getBounds();
+      const filterRect = `${bounds[0][1]},${bounds[0][0]},${bounds[1][1]},${bounds[1][0]}`;
+      
+      try {
+        const newPlaces = await geoService.getPlacesByBounds(filterRect);
+        setAllPlaces(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          const uniqueNew = newPlaces.filter((p: any) => !existingIds.has(p.id));
+          return [...prev, ...uniqueNew];
+        });
+      } catch (e) {
+        console.error("Ошибка подгрузки точек:", e);
+      }
+    }, 500); // Задержка 500ms
+  }, []);
 
   // 4. УСЛОВНЫЕ ВОЗВРАТЫ ДЛЯ ЭКРАНОВ ЗАГРУЗКИ И ОШИБОК (ПОСЛЕ ВСЕХ ХУКОВ)
   if (loading) {
@@ -246,7 +270,8 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
 
           <YMaps query={YANDEX_MAPS_QUERY} preload>
             <YMap
-              defaultState={{ center: mapCenter, zoom: 9 }}
+              onBoundsChange={handleBoundsChange}
+              defaultState={{ center: [45.035, 38.975], zoom: 8 }}
               width="100%"
               height="100%"
               options={{ suppressMapOpenBlock: true }}
