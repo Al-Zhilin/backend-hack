@@ -24,24 +24,66 @@ async def shutdown():
 
 
 # --- СХЕМЫ ---
+class PlaceItem(BaseModel):
+    id: str = Field(..., description="ID из 2GIS или сгенерированный")
+    name: str
+    lat: float
+    lon: float
+    address: str
+    tag: str
+
+class StartPoint(BaseModel):
+    name: str
+    lat: float
+    lon: float
+
+class GenerateRouteRequest(BaseModel):
+    login: str
+    transport_mode: str
+    start_point: StartPoint
+    selected_places: List[PlaceItem] = Field(..., description="Список мест, которые выбрал пользователь")
+
 class ChatRequest(BaseModel):
     login: str = Field(..., example="user123")
     text: str = Field(..., example="Я хочу погулять пешком по Москве, люблю музеи.")
-
 
 class CollectedTags(BaseModel):
     start_location: str = Field(..., example="Москва, Красная площадь 1")
     transport_mode: str = Field(..., example="пешеход")
     categories: List[str] = Field(..., example=["кофейня", "музей"])
 
-
 class TourCollectedData(BaseModel):
     login: str = Field(..., example="user123")
     status: str = Field(..., example="completed")
     collected_tags: CollectedTags
 
-
 # --- ЭНДПОИНТЫ ---
+@app.post("/api/search_places")
+async def search_places_for_user(data: TourCollectedData):
+    print(f"📍 Ищу места для пользователя {data.login}...")
+    tags = data.collected_tags
+
+    # 1. Получаем координаты старта
+    start_point = await gisapi.GISService.get_coordinates_yandex(tags.start_location)
+    if not start_point:
+        start_point = {"name": tags.start_location + " (Координаты по умолчанию)", "lat": 55.749, "lon": 37.539}
+
+    # 2. Ищем места по тегам
+    places = await gisapi.GISService.get_places_by_tags(
+        start_point["lat"],
+        start_point["lon"],
+        tags.categories
+    )
+
+    print(f"✅ Найдено мест: {len(places)}. Отправляю на фронтенд для выбора.")
+
+    # Отправляем данные клиенту
+    return {
+        "login": data.login,
+        "transport_mode": tags.transport_mode,
+        "start_point": start_point,
+        "suggested_places": places
+    }
 
 @app.post("/api/chat")
 async def proxy_chat(data: ChatRequest):
@@ -61,62 +103,69 @@ async def proxy_chat(data: ChatRequest):
     return StreamingResponse(stream_generator(), media_type="text/plain")
 
 
-async def generate_tour_background(data: TourCollectedData):
+async def build_selected_route_background(data: GenerateRouteRequest):
     try:
-        print(f"\n🚀 [ФОН] Начинаю генерацию маршрута для {data.login}...")
+        print(f"\n🚀 [ФОН] Строю маршрут по выбранным местам для {data.login}...")
 
         db = await database.get_db()
         if db is None:
-            print("❌ [ФОН] Ошибка: Нет подключения к базе данных MongoDB!")
+            print("❌ [ФОН] Ошибка: Нет подключения к БД!")
             return
 
-        tags = data.collected_tags
+        start_point = data.start_point.model_dump()
+        # Превращаем Pydantic объекты в обычные словари для gisapi
+        places_dicts = [place.model_dump() for place in data.selected_places]
 
-        print("📍 1. Получаю координаты старта через Яндекс...")
-        start_point = await gisapi.GISService.get_coordinates_yandex(tags.start_location)
-        if not start_point:
-            print("⚠️ Яндекс не нашел адрес, использую дефолтные координаты (Москва-Сити)")
-            start_point = {"name": "Москва-Сити (По умолчанию)", "lat": 55.749, "lon": 37.539}
+        print("🗺️ Решаю задачу Коммивояжера для выбранных точек...")
+        optimized_route = await gisapi.GISService.solve_tsp_2gis(
+            start_point,
+            places_dicts,
+            data.transport_mode
+        )
 
-        print("🏢 2. Ищу места по тегам через 2GIS...")
-        places = await gisapi.GISService.get_places_by_tags(start_point["lat"], start_point["lon"], tags.categories)
-        print(f"✅ Найдено мест: {len(places)}")
-
-        print("🗺️ 3. Решаю задачу Коммивояжера (Матрица 2GIS)...")
-        optimized_route = await gisapi.GISService.solve_tsp_2gis(start_point, places, tags.transport_mode)
-
-        print("🚌 4. Собираю расписание транспорта (Яндекс)...")
+        print("🚌 Собираю расписание транспорта...")
         route_steps = []
         for i in range(len(optimized_route) - 1):
             curr_p, next_p = optimized_route[i], optimized_route[i + 1]
             step = {"from": curr_p, "to": next_p, "schedule": []}
 
-            if tags.transport_mode.lower() == "пешеход":
-                step["schedule"] = await gisapi.GISService.get_yandex_schedule(curr_p, next_p)
-
+            # Ищем расписание (если нужно, уберите проверку на пешехода, чтобы транспорт искался всегда)
+            step["schedule"] = await gisapi.GISService.get_yandex_schedule(curr_p, next_p)
             route_steps.append(step)
 
-        print("💾 5. Сохраняю маршрут в БД...")
+        print("💾 Сохраняю итоговый маршрут в БД...")
         final_doc = {
             "login": data.login,
-            "start_location": tags.start_location,
-            "transport_mode": tags.transport_mode,
+            "start_location": start_point["name"],
+            "transport_mode": data.transport_mode,
             "route_steps": route_steps,
             "created_at": datetime.now(timezone.utc).isoformat()
-            # Сохраняем как строку для избежания проблем с парсингом
         }
 
-        await db["Places"].update_one({"login": data.login}, {"$set": final_doc}, upsert=True)
-        print(f"🎉 [ФОН] Маршрут для {data.login} успешно создан и сохранен!\n")
+        # Сохраняем в коллекцию (убедитесь, что название совпадает с вашим MongoDB Atlas, например "Users" или "generated_tours")
+        await db["generated_tours"].update_one(
+            {"login": data.login},
+            {"$set": final_doc},
+            upsert=True
+        )
+        print(f"🎉 [ФОН] Маршрут для {data.login} успешно создан!\n")
 
     except Exception as e:
-        print(f"❌ [ФОН] КРИТИЧЕСКАЯ ОШИБКА ГЕНЕРАЦИИ: {e}")
+        print(f"❌ [ФОН] ОШИБКА СБОРКИ МАРШРУТА: {e}")
 
 
-@app.post("/api/receive_tour_data")
-async def receive_webhook(data: TourCollectedData, background_tasks: BackgroundTasks):
-    background_tasks.add_task(generate_tour_background, data)
-    return {"status": "success", "message": "Процесс создания тура запущен в фоне, проверьте логи сервера"}
+@app.post("/api/generate_route")
+async def generate_route_endpoint(data: GenerateRouteRequest, background_tasks: BackgroundTasks):
+    if not data.selected_places:
+        return JSONResponse(status_code=400, content={"message": "Вы не выбрали ни одного места!"})
+
+    # Запускаем сборку маршрута в фоне
+    background_tasks.add_task(build_selected_route_background, data)
+
+    return {
+        "status": "success",
+        "message": "Места получены. Оптимизируем маршрут и ищем транспорт!"
+    }
 
 
 @app.get("/api/get_user_route/{login}")
