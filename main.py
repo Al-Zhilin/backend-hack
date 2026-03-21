@@ -1,5 +1,35 @@
-from fastapi import FastAPI
+import os
+import httpx
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Any, Dict
+
+YANDEX_GEOCODER_API_KEY = os.getenv("YANDEX_GEOCODER_API_KEY", "ВАШ_КЛЮЧ_ГЕОКОДЕРА")
+YANDEX_RASP_API_KEY = os.getenv("YANDEX_RASP_API_KEY", "ВАШ_КЛЮЧ_РАСПИСАНИЙ")
+
+GEOCODER_URL = "https://geocode-maps.yandex.ru/1.x/"
+RASP_API_URL = "https://api.rasp.yandex.net/v3.0/search/"
+
+class Segment(BaseModel):
+    """Модель одного сегмента пути (например, поезд, автобус)"""
+    departure: str
+    arrival: str
+    start_time: str
+    end_time: str
+    transport_type: str
+    carrier_name: Optional[str] = None
+
+class Route(BaseModel):
+    """Модель всего маршрута (может состоять из нескольких сегментов)"""
+    total_duration: int  # в минутах
+    segments: List[Segment]
+
+class RoutesResponse(BaseModel):
+    """Финальная структура ответа"""
+    from_address: str
+    to_address: str
+    routes: List[Route]
 
 app = FastAPI()
 
@@ -86,6 +116,148 @@ TOURS_DATA = {
     }
   ]
 }
+
+# --- 3. Вспомогательные функции для работы с API ---
+async def get_coordinates(address: str, client: httpx.AsyncClient) -> tuple[float, float]:
+    """
+    Преобразует текстовый адрес в координаты (широта, долгота) через Яндекс.Геокодер.
+    Возвращает кортеж (lat, lon).
+    """
+    params = {
+        "apikey": YANDEX_GEOCODER_API_KEY,
+        "geocode": address,
+        "format": "json",
+        "results": 1  # Нам нужен только самый релевантный результат
+    }
+
+    try:
+        response = await client.get(GEOCODER_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        # Парсим JSON ответ геокодера
+        geo_object = data["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+        pos = geo_object["Point"]["pos"]
+        lon, lat = map(float, pos.split())
+        return lat, lon
+
+    except (KeyError, IndexError, httpx.HTTPStatusError) as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось найти координаты для адреса '{address}'. Ошибка: {str(e)}"
+        )
+
+
+async def find_nearest_city(lat: float, lon: float, client: httpx.AsyncClient) -> str:
+    """
+    Находит ближайший к координатам населенный пункт (город/станцию) для API Расписаний.
+    API Расписаний работает с кодами станций, поэтому нам нужен ближайший транспортный узел.
+    """
+    # Используем метод /nearest_stations API Расписаний
+    params = {
+        "apikey": YANDEX_RASP_API_KEY,
+        "lat": lat,
+        "lng": lon,
+        "distance": 50,  # ищем в радиусе 50 км
+        "format": "json"
+    }
+
+    try:
+        response = await client.get("https://api.rasp.yandex.net/v3.0/nearest_stations/", params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("stations") and len(data["stations"]) > 0:
+            # Берем самую ближайшую станцию или город
+            nearest = data["stations"][0]
+            # Возвращаем код станции (например, 's9600213') или название, если кода нет
+            return nearest.get("station", {}).get("code") or nearest.get("city", {}).get("code")
+        else:
+            raise HTTPException(status_code=404, detail="Не найдено транспортных узлов поблизости")
+
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при поиске ближайшей станции: {str(e)}")
+
+
+async def search_routes(from_code: str, to_code: str, client: httpx.AsyncClient) -> Dict[str, Any]:
+    """
+    Ищет маршруты между двумя кодами станций/городов через API Яндекс.Расписаний.
+    """
+    params = {
+        "apikey": YANDEX_RASP_API_KEY,
+        "from": from_code,
+        "to": to_code,
+        "format": "json",
+        "transfers": True,  # Разрешаем маршруты с пересадками
+        "limit": 5  # Ограничиваем количество вариантов для ответа
+    }
+
+    try:
+        response = await client.get(RASP_API_URL, params=params)
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка при поиске маршрутов: {str(e)}")
+
+
+# --- 4. Основной эндпоинт FastAPI ---
+@app.get("/api/routes", response_model=RoutesResponse)
+async def get_routes(
+        from_place: str = Query(..., description="Название начальной точки (например, 'Москва, Красная площадь')"),
+        to_place: str = Query(..., description="Название конечной точки (например, 'Санкт-Петербург, Эрмитаж')"),
+):
+    """
+    Принимает названия двух объектов и возвращает возможные маршруты между ними.
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        # Шаг 1: Получаем координаты для обоих мест
+        from_lat, from_lon = await get_coordinates(from_place, client)
+        to_lat, to_lon = await get_coordinates(to_place, client)
+
+        # Шаг 2: Находим коды ближайших транспортных узлов (станций/городов)
+        from_code = await find_nearest_city(from_lat, from_lon, client)
+        to_code = await find_nearest_city(to_lat, to_lon, client)
+
+        # Шаг 3: Ищем маршруты между этими узлами
+        rasp_data = await search_routes(from_code, to_code, client)
+
+        # Шаг 4: Преобразуем ответ API Расписаний в нашу модель Route
+        routes = []
+        for segment_group in rasp_data.get("segments", []):
+            segments_list = []
+            total_duration = 0
+
+            for seg in segment_group:
+                # Извлекаем информацию о каждом сегменте пути
+                departure = seg.get("departure", "")
+                arrival = seg.get("arrival", "")
+                start_time = seg.get("departure_time", "")
+                end_time = seg.get("arrival_time", "")
+                transport_type = seg.get("transport", {}).get("type", "unknown")
+                carrier_name = seg.get("carrier", {}).get("title", None)
+
+                segments_list.append(Segment(
+                    departure=departure,
+                    arrival=arrival,
+                    start_time=start_time,
+                    end_time=end_time,
+                    transport_type=transport_type,
+                    carrier_name=carrier_name
+                ))
+
+                # Считаем длительность (в минутах)
+                if seg.get("duration"):
+                    total_duration += int(seg["duration"])
+
+            if segments_list:
+                routes.append(Route(total_duration=total_duration, segments=segments_list))
+
+        # Шаг 5: Возвращаем результат
+        return RoutesResponse(
+            from_address=from_place,
+            to_address=to_place,
+            routes=routes
+        )
 
 @app.post("/")
 def root():
