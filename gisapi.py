@@ -1,62 +1,144 @@
 import httpx
-import math
+import logging
 from typing import List, Dict, Any
-from loader import DGIS_KEY, DGIS_CATALOG_URL, DGIS_ROUTING_URL, YANDEX_GEO_KEY, YANDEX_RASP_KEY
+from datetime import datetime
+from loader import (
+    DGIS_KEY, DGIS_CATALOG_URL, DGIS_ROUTING_URL, DGIS_MATRIX_URL,
+    YANDEX_GEO_KEY, YANDEX_RASP_KEY, YANDEX_GEO_URL, YANDEX_RASP_STATIONS_URL, YANDEX_RASP_SEARCH_URL
+)
+
+logger = logging.getLogger(__name__)
 
 
 class GISService:
+
     @staticmethod
-    async def find_places_by_tags(tags: List[str], city_center: str = "37.6176,55.7558") -> List[Dict]:
-        """Поиск мест в 2GIS по набору тегов"""
-        all_places = []
+    async def get_coordinates_yandex(address: str) -> dict:
+        """Получение координат старта через Yandex Geocoder"""
+        params = {"apikey": YANDEX_GEO_KEY, "geocode": address, "format": "json", "results": 1}
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(YANDEX_GEO_URL, params=params)
+            if resp.status_code == 200:
+                data = resp.json()
+                try:
+                    pos = data["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["Point"]["pos"]
+                    lon, lat = map(float, pos.split())
+                    return {"lat": lat, "lon": lon, "name": address}
+                except (KeyError, IndexError):
+                    pass
+        return None
+
+    @staticmethod
+    async def get_places_by_tags(lat: float, lon: float, tags: List[str], radius: int = 5000) -> List[dict]:
+        """Поиск интересных мест через 2GIS Catalog API по массиву тегов"""
+        places = []
         async with httpx.AsyncClient() as client:
             for tag in tags:
-                resp = await client.get(DGIS_CATALOG_URL, params={
-                    "q": tag,
-                    "point": city_center,
-                    "radius": 5000,
-                    "key": DGIS_KEY,
-                    "fields": "items.point,items.address_name"
+                res = await client.get(DGIS_CATALOG_URL, params={
+                    "q": tag, "point": f"{lon},{lat}", "radius": radius,
+                    "key": DGIS_KEY, "fields": "items.point,items.address_name",
+                    "page_size": 2  # Берем 1-2 лучших места по каждому тегу для разнообразия
                 })
-                if resp.status_code == 200 and "result" in resp.json():
-                    items = resp.json()["result"]["items"]
-                    for i in items:
-                        all_places.append({
+                items = res.json().get("result", {}).get("items", [])
+                for i in items:
+                    if "point" in i:
+                        places.append({
+                            "id": i.get("id"),
                             "name": i["name"],
                             "lat": i["point"]["lat"],
                             "lon": i["point"]["lon"],
                             "address": i.get("address_name", ""),
                             "tag": tag
                         })
-        return all_places
+        # Убираем дубликаты
+        unique_places = {p["id"]: p for p in places if p["id"]}.values()
+        return list(unique_places)
 
     @staticmethod
-    def solve_tsp(start_node: Dict, locations: List[Dict]) -> List[Dict]:
-        """Алгоритм ближайшего соседа для сортировки точек"""
-        ordered = [start_node]
-        unvisited = list(locations)
-        curr = start_node
-        while unvisited:
-            next_p = min(unvisited, key=lambda p: math.hypot(p['lat'] - curr['lat'], p['lon'] - curr['lon']))
-            ordered.append(next_p)
-            unvisited.remove(next_p)
-        return ordered
+    async def solve_tsp_2gis(start_point: dict, places: List[dict], transport_mode: str) -> List[dict]:
+        """Задача коммивояжера с использованием API Матрицы расстояний 2ГИС"""
+        if not places:
+            return [start_point]
 
-    @staticmethod
-    async def get_yandex_schedule(lat: float, lon: float) -> Dict:
-        """Получение расписания ближайшего транспорта через Яндекс"""
+        points = [start_point] + places
+        coords = [{"lat": p["lat"], "lon": p["lon"]} for p in points]
+
+        # profile: driving (авто) или pedestrian (пешеход)
+        profile = "driving" if transport_mode.lower() == "машина" else "pedestrian"
+
+        payload = {
+            "sources": coords,
+            "targets": coords,
+            "profile": profile,
+            "type": "shortest"  # Ищем оптимальное время (или shortest для расстояния)
+        }
+
         async with httpx.AsyncClient() as client:
-            # 1. Ищем ближайшую станцию/остановку
-            st_res = await client.get("https://api.rasp.yandex.net/v3.0/nearest_stations/", params={
-                "apikey": YANDEX_RASP_KEY, "lat": lat, "lng": lon, "distance": 1000, "format": "json"
-            })
-            if st_res.status_code != 200 or not st_res.json().get("stations"):
-                return {"schedule": "Нет данных"}
+            resp = await client.post(f"{DGIS_MATRIX_URL}?key={DGIS_KEY}", json=payload)
+            if resp.status_code != 200:
+                logger.error(f"Ошибка 2GIS Matrix API: {resp.text}")
+                return points  # Возвращаем как есть при ошибке
 
-            station_code = st_res.json()["stations"][0]["code"]
+            matrix_data = resp.json().get("routes", [])
 
-            # 2. Берем расписание по этой станции
-            sched_res = await client.get("https://api.rasp.yandex.net/v3.0/schedule/", params={
-                "apikey": YANDEX_RASP_KEY, "station": station_code, "format": "json"
+            if not matrix_data:
+                return points
+
+            # Реализация алгоритма ближайшего соседа по реальной матрице
+            ordered = [points[0]]
+            unvisited_indices = set(range(1, len(points)))
+            curr_idx = 0
+
+            while unvisited_indices:
+                # Ищем ближайшую не посещенную точку по времени маршрута
+                next_idx = min(
+                    unvisited_indices,
+                    key=lambda idx: matrix_data[curr_idx][idx]["duration"]
+                )
+                ordered.append(points[next_idx])
+                unvisited_indices.remove(next_idx)
+                curr_idx = next_idx
+
+            return ordered
+
+    @staticmethod
+    async def get_yandex_schedule(p1: dict, p2: dict) -> List[dict]:
+        """Парсинг расписания Яндекс (поиск ближайших станций + расписание между ними)"""
+        async with httpx.AsyncClient() as client:
+            # 1. Находим код ближайшей станции отправления
+            res1 = await client.get(YANDEX_RASP_STATIONS_URL, params={
+                "apikey": YANDEX_RASP_KEY, "lat": p1["lat"], "lon": p1["lon"],
+                "distance": 3, "format": "json"
             })
-            return sched_res.json() if sched_res.status_code == 200 else {}
+            stations1 = res1.json().get("stations", [])
+            if not stations1: return []
+
+            # 2. Находим код ближайшей станции прибытия
+            res2 = await client.get(YANDEX_RASP_STATIONS_URL, params={
+                "apikey": YANDEX_RASP_KEY, "lat": p2["lat"], "lon": p2["lon"],
+                "distance": 3, "format": "json"
+            })
+            stations2 = res2.json().get("stations", [])
+            if not stations2: return []
+
+            code_from = stations1[0]["code"]
+            code_to = stations2[0]["code"]
+
+            # 3. Ищем расписание между станциями
+            sched_res = await client.get(YANDEX_RASP_SEARCH_URL, params={
+                "apikey": YANDEX_RASP_KEY, "from": code_from, "to": code_to,
+                "format": "json", "date": datetime.now().strftime("%Y-%m-%d")
+            })
+
+            threads = sched_res.json().get("segments", [])
+
+            # Возвращаем 3 ближайших рейса
+            schedules = []
+            for t in threads[:3]:
+                schedules.append({
+                    "transport_type": t["thread"]["transport_type"],
+                    "title": t["thread"]["title"],
+                    "departure": t["departure"],
+                    "arrival": t["arrival"]
+                })
+            return schedules
