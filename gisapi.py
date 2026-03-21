@@ -102,35 +102,59 @@ class GISService:
     async def get_yandex_schedule(p1: dict, p2: dict) -> List[dict]:
         try:
             async with httpx.AsyncClient() as client:
+                # 1. Ищем ближайшие станции к точке отправления (увеличим радиус до 5км)
                 res1 = await client.get(YANDEX_RASP_STATIONS_URL, params={
-                    "apikey": YANDEX_RASP_KEY, "lat": p1["lat"], "lon": p1["lon"], "distance": 2, "format": "json"
+                    "apikey": YANDEX_RASP_KEY, "lat": p1["lat"], "lon": p1["lon"],
+                    "distance": 5, "format": "json", "lang": "ru_RU"
                 })
                 stations1 = res1.json().get("stations", [])
-                if not stations1: return [{"title": "Поблизости нет остановок отправления"}]
 
+                # 2. Ищем ближайшие станции к точке прибытия
                 res2 = await client.get(YANDEX_RASP_STATIONS_URL, params={
-                    "apikey": YANDEX_RASP_KEY, "lat": p2["lat"], "lon": p2["lon"], "distance": 2, "format": "json"
+                    "apikey": YANDEX_RASP_KEY, "lat": p2["lat"], "lon": p2["lon"],
+                    "distance": 5, "format": "json", "lang": "ru_RU"
                 })
                 stations2 = res2.json().get("stations", [])
-                if not stations2: return [{"title": "Поблизости нет остановок прибытия"}]
 
-                code_from, code_to = stations1[0]["code"], stations2[0]["code"]
+                # Если остановок вообще нет в радиусе 5км
+                if not stations1:
+                    return [{"title": "🚶 Ближайших остановок не найдено. Рекомендуем пройтись пешком или такси."}]
 
+                if not stations2:
+                    return [{
+                                "title": f"🚌 Остановка отправления: {stations1[0]['title']}. У места назначения остановок нет."}]
+
+                # Берем самую близкую остановку
+                code_from = stations1[0]["code"]
+                code_to = stations2[0]["code"]
+                station_name = stations1[0]["title"]
+
+                # 3. Пытаемся найти прямые рейсы (автобусы, электрички)
                 sched_res = await client.get(YANDEX_RASP_SEARCH_URL, params={
                     "apikey": YANDEX_RASP_KEY, "from": code_from, "to": code_to,
                     "format": "json", "date": datetime.now().strftime("%Y-%m-%d")
                 })
 
                 threads = sched_res.json().get("segments", [])
-                if not threads: return [{"title": "Прямых маршрутов нет"}]
 
+                # ФОЛБЕК: Если прямых рейсов нет (нужна пересадка)
+                if not threads:
+                    return [{
+                        "title": f"🔄 Прямых рейсов нет. Ближайшая остановка: {station_name}",
+                        "transport_type": "bus/walking",
+                        "number": "Any"
+                    }]
+
+                # Если рейсы есть, возвращаем топ-3
                 return [{
-                    "transport_type": t["thread"].get("transport_type", ""),
+                    "transport_type": t["thread"].get("transport_type", "транспорт"),
                     "number": t["thread"].get("number", ""),
-                    "title": t["thread"].get("title", ""),
-                    "departure": t.get("departure", ""),
-                    "arrival": t.get("arrival", "")
+                    "title": t["thread"].get("title", "Маршрут"),
+                    "departure": t.get("departure", "")[-8:-3] if t.get("departure") else "---",
+                    # Берем только время HH:MM
+                    "arrival": t.get("arrival", "")[-8:-3] if t.get("arrival") else "---"
                 } for t in threads[:3]]
+
         except Exception as e:
             print(f"❌ Ошибка Я.Расписания: {e}")
-            return [{"title": "Ошибка получения расписания (проверьте API ключ)"}]
+            return [{"title": "🕒 Не удалось загрузить расписание"}]
