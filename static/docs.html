@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transit & Tour Master — API Docs</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.6; }
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-bottom: 1px solid #1e293b; padding: 2rem 0; }
+        .header-inner { max-width: 960px; margin: 0 auto; padding: 0 1.5rem; }
+        .header h1 { font-size: 2rem; font-weight: 700; color: #f8fafc; }
+        .header p { color: #94a3b8; margin-top: 0.5rem; font-size: 1.05rem; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; margin-left: 0.75rem; vertical-align: middle; }
+        .badge-green { background: #065f46; color: #6ee7b7; }
+
+        .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+        .section { margin-bottom: 2.5rem; }
+        .section-title { font-size: 1.25rem; font-weight: 600; color: #f8fafc; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #1e293b; }
+
+        .endpoint { background: #1e293b; border: 1px solid #334155; border-radius: 10px; margin-bottom: 1rem; overflow: hidden; }
+        .endpoint-header { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; cursor: pointer; user-select: none; }
+        .endpoint-header:hover { background: #253347; }
+        .method { padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.8rem; font-weight: 700; font-family: monospace; min-width: 60px; text-align: center; }
+        .method-get { background: #064e3b; color: #6ee7b7; }
+        .method-post { background: #1e3a5f; color: #60a5fa; }
+        .path { font-family: monospace; font-size: 0.95rem; color: #f1f5f9; }
+        .desc { color: #94a3b8; margin-left: auto; font-size: 0.85rem; }
+        .arrow { color: #64748b; transition: transform 0.2s; font-size: 0.8rem; }
+        .endpoint.open .arrow { transform: rotate(90deg); }
+
+        .endpoint-body { display: none; padding: 1rem 1.25rem; border-top: 1px solid #334155; background: #162032; }
+        .endpoint.open .endpoint-body { display: block; }
+
+        .param-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+        .param-table th { text-align: left; color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; padding: 0.4rem 0.75rem; border-bottom: 1px solid #334155; }
+        .param-table td { padding: 0.5rem 0.75rem; font-size: 0.85rem; border-bottom: 1px solid #1e293b; }
+        .param-name { font-family: monospace; color: #fbbf24; }
+        .param-type { color: #a78bfa; font-family: monospace; font-size: 0.8rem; }
+        .param-required { color: #f87171; font-size: 0.75rem; }
+        .param-optional { color: #64748b; font-size: 0.75rem; }
+
+        .response-block { margin-top: 0.75rem; }
+        .response-label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.25rem; }
+        pre { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; color: #e2e8f0; }
+
+        .env-table { width: 100%; border-collapse: collapse; }
+        .env-table th { text-align: left; color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; }
+        .env-table td { padding: 0.6rem 0.75rem; font-size: 0.9rem; border-bottom: 1px solid #1e293b; }
+        .env-var { font-family: monospace; color: #fbbf24; }
+
+        .footer { text-align: center; color: #475569; font-size: 0.8rem; padding: 2rem 0; border-top: 1px solid #1e293b; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-inner">
+        <h1>Transit & Tour Master <span class="badge badge-green">v1.0</span></h1>
+        <p>REST API для генерации туристических маршрутов — 2ГИС, Яндекс, MongoDB</p>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- Healthcheck -->
+    <div class="section">
+        <div class="section-title">Healthcheck</div>
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-get">GET</span>
+                <span class="path">/healthcheck</span>
+                <span class="desc">Проверка работоспособности</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="response-block">
+                    <div class="response-label">Ответ 200</div>
+                    <pre>{ "status": "ok", "service": "Transit & Tour Master" }</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Proxy -->
+    <div class="section">
+        <div class="section-title">Прокси-эндпоинты</div>
+
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-post">POST</span>
+                <span class="path">/api/chat</span>
+                <span class="desc">Чат (streaming)</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:0.5rem">Проксирует запрос к внешнему LLM-сервису. Ответ — поток текста (text/plain).</p>
+                <div class="response-label">Тело запроса (JSON)</div>
+                <pre>{ "message": "Расскажи про достопримечательности Казани" }</pre>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-get">GET</span>
+                <span class="path">/api/get-panorama</span>
+                <span class="desc">Панорама по координатам</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <table class="param-table">
+                    <tr><th>Параметр</th><th>Тип</th><th>Описание</th><th></th></tr>
+                    <tr><td class="param-name">lat</td><td class="param-type">float</td><td>Широта</td><td class="param-required">обязательный</td></tr>
+                    <tr><td class="param-name">lon</td><td class="param-type">float</td><td>Долгота</td><td class="param-required">обязательный</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-get">GET</span>
+                <span class="path">/panorama-image/{file_id}</span>
+                <span class="desc">Изображение панорамы</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <table class="param-table">
+                    <tr><th>Параметр</th><th>Тип</th><th>Описание</th><th></th></tr>
+                    <tr><td class="param-name">file_id</td><td class="param-type">string</td><td>ID файла панорамы</td><td class="param-required">обязательный</td></tr>
+                </table>
+                <div class="response-block">
+                    <div class="response-label">Ответ 200</div>
+                    <pre>image/jpeg</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tours -->
+    <div class="section">
+        <div class="section-title">Туры</div>
+
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-post">POST</span>
+                <span class="path">/api/v1/search-places</span>
+                <span class="desc">Поиск отеля и мест рядом</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <table class="param-table">
+                    <tr><th>Параметр</th><th>Тип</th><th>Описание</th><th></th></tr>
+                    <tr><td class="param-name">hotel_query</td><td class="param-type">string</td><td>Название или запрос для поиска отеля</td><td class="param-required">обязательный</td></tr>
+                    <tr><td class="param-name">category</td><td class="param-type">string</td><td>Категория мест (кафе, музеи и т.д.)</td><td class="param-required">обязательный</td></tr>
+                    <tr><td class="param-name">radius</td><td class="param-type">int</td><td>Радиус поиска в метрах</td><td class="param-optional">по умолчанию 1500</td></tr>
+                </table>
+                <div class="response-block">
+                    <div class="response-label">Ответ 200</div>
+                    <pre>{
+  "hotel": { "name": "Отель Казань", "point": { "lat": 55.79, "lon": 49.12 } },
+  "candidates": [
+    { "_id": "...", "name": "Кремль", "lat": 55.80, "lon": 49.11, "address": "..." }
+  ]
+}</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-post">POST</span>
+                <span class="path">/api/v1/build-tour</span>
+                <span class="desc">Построить оптимальный маршрут</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="response-label">Тело запроса (JSON)</div>
+                <pre>{
+  "hotel_data": { "name": "Отель Казань", "point": { "lat": 55.79, "lon": 49.12 } },
+  "selected_ids": ["665f...", "665f..."]
+}</pre>
+                <div class="response-block">
+                    <div class="response-label">Ответ 200</div>
+                    <pre>{
+  "_id": "...",
+  "user_hotel": "Отель Казань",
+  "route": [ ... ],
+  "metrics": { "time_min": 25.3, "dist_m": 12400, "geometry": "..." },
+  "created_at": "2026-03-21T12:00:00Z"
+}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Webhooks -->
+    <div class="section">
+        <div class="section-title">Вебхуки и транспорт</div>
+
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-post">POST</span>
+                <span class="path">/api/receive_tour_data</span>
+                <span class="desc">Вебхук — данные тура</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <div class="response-label">Тело запроса (JSON)</div>
+                <pre>{
+  "login": "user123",
+  "status": "completed",
+  "collected_tags": { "city": "Казань", "days": 3 }
+}</pre>
+                <div class="response-block">
+                    <div class="response-label">Ответ 200</div>
+                    <pre>{ "status": "success" }</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="endpoint">
+            <div class="endpoint-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="method method-get">GET</span>
+                <span class="path">/api/routes</span>
+                <span class="desc">Маршруты между точками</span>
+                <span class="arrow">&#9654;</span>
+            </div>
+            <div class="endpoint-body">
+                <table class="param-table">
+                    <tr><th>Параметр</th><th>Тип</th><th>Описание</th><th></th></tr>
+                    <tr><td class="param-name">from_place</td><td class="param-type">string</td><td>Начальная точка</td><td class="param-required">обязательный</td></tr>
+                    <tr><td class="param-name">to_place</td><td class="param-type">string</td><td>Конечная точка</td><td class="param-required">обязательный</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Env -->
+    <div class="section">
+        <div class="section-title">Переменные окружения</div>
+        <table class="env-table">
+            <tr><th>Переменная</th><th>Описание</th></tr>
+            <tr><td class="env-var">YANDEX_GEOCODER_API_KEY</td><td>Ключ Яндекс Геокодера</td></tr>
+            <tr><td class="env-var">YANDEX_RASP_API_KEY</td><td>Ключ Яндекс Расписаний</td></tr>
+            <tr><td class="env-var">DGis_API_KEY</td><td>Ключ 2ГИС API</td></tr>
+            <tr><td class="env-var">MONGO_URI</td><td>URI подключения к MongoDB</td></tr>
+        </table>
+    </div>
+
+</div>
+
+<div class="footer">Transit & Tour Master &copy; 2026</div>
+
+</body>
+</html>

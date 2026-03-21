@@ -1,0 +1,8 @@
+.env
+.git
+.gitignore
+.idea
+__pycache__
+*.pyc
+*.pyo
+notebook.ipynb
