@@ -19,7 +19,7 @@ load_dotenv()
 YANDEX_GEO_KEY = os.getenv("YANDEX_GEOCODER_API_KEY")
 YANDEX_RASP_KEY = os.getenv("YANDEX_RASP_API_KEY")
 DGIS_KEY = os.getenv("DGis_API_KEY")
-AI_SERVER_URL = "https://ratable-convalescently-epifania.ngrok-free.dev/chat"
+BASE_LOCAL_URL = "https://ratable-convalescently-epifania.ngrok-free.dev"
 
 # Схемы данных (строгие)
 class Segment(BaseModel):
@@ -66,7 +66,7 @@ async def proxy_chat(request: Request):
         async with httpx.AsyncClient() as client:
             async with client.stream(
                     "POST",
-                    f"{LOCAL_SERVER_URL}/chat",
+                    f"{BASE_LOCAL_URL}/chat",
                     json=body,
                     timeout=None
             ) as response:
@@ -82,7 +82,7 @@ async def proxy_get_panorama(lat: float, lon: float):
     async with httpx.AsyncClient() as client:
         # Пересылаем lat и lon на локальный ПК
         response = await client.get(
-            f"{LOCAL_SERVER_URL}/get-panorama",
+            f"{BASE_LOCAL_URL}/get-panorama",
             params={"lat": lat, "lon": lon}
         )
         return response.json()
@@ -93,7 +93,7 @@ async def proxy_get_panorama(lat: float, lon: float):
 async def proxy_image(file_id: str):
     async with httpx.AsyncClient() as client:
         # Запрашиваем бинарные данные картинки у локального сервера
-        response = await client.get(f"{LOCAL_SERVER_URL}/panorama-image/{file_id}")
+        response = await client.get(f"{BASE_LOCAL_URL}/panorama-image/{file_id}")
 
         if response.status_code == 200:
             # Возвращаем картинку с правильным типом контента
