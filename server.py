@@ -1,15 +1,15 @@
 import httpx
 import database
 import gisapi
-from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from typing import List
 from datetime import datetime, timezone
 from loader import BASE_LOCAL_URL
 
-app = FastAPI(title="Transit & Tour Master API", description="АПИ для генерации туров и общения с LLM")
+app = FastAPI(title="Transit & Tour Master API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -23,11 +23,10 @@ async def shutdown():
     await database.close_mongo()
 
 
-# --- СХЕМЫ ДАННЫХ ДЛЯ SWAGGER UI ---
-
+# --- СХЕМЫ ---
 class ChatRequest(BaseModel):
     login: str = Field(..., example="user123")
-    message: str = Field(..., example="Я хочу погулять пешком по Москве, люблю музеи и кофе.")
+    message: str = Field(..., example="Я хочу погулять пешком по Москве, люблю музеи.")
 
 
 class CollectedTags(BaseModel):
@@ -42,100 +41,100 @@ class TourCollectedData(BaseModel):
     collected_tags: CollectedTags
 
 
-# --- 1. ПРОКСИ ДЛЯ ЧАТА ---
+# --- ЭНДПОИНТЫ ---
 
-@app.post("/api/chat", summary="Отправить сообщение нейросети (Streaming)")
+@app.post("/api/chat")
 async def proxy_chat(data: ChatRequest):
-    """
-    Отправляет запрос на удаленный сервер с моделью и возвращает ответ по частям (стриминг).
-    """
-
     async def stream_generator():
-        async with httpx.AsyncClient() as client:
-            try:
-                async with client.stream("POST", f"{BASE_LOCAL_URL}/chat", json=data.dict(), timeout=60.0) as response:
+        try:
+            async with httpx.AsyncClient() as client:
+                # Используем model_dump() вместо dict() для новой Pydantic
+                async with client.stream("POST", f"{BASE_LOCAL_URL}/chat", json=data.model_dump(),
+                                         timeout=10.0) as response:
                     async for chunk in response.aiter_text():
                         yield chunk
-            except Exception as e:
-                yield f"Ошибка соединения с LLM: {str(e)}"
+        except httpx.ConnectError:
+            yield "❌ ОШИБКА: Не удалось подключиться к серверу с нейромоделью. Убедитесь, что сервер по адресу BASE_LOCAL_URL запущен."
+        except Exception as e:
+            yield f"❌ Неизвестная ошибка: {str(e)}"
 
     return StreamingResponse(stream_generator(), media_type="text/plain")
 
 
-# --- 2. ГЕНЕРАЦИЯ ТУРА (ФОНОВАЯ ЗАДАЧА) ---
-
 async def generate_tour_background(data: TourCollectedData):
-    """Фоновый воркер генерации тура"""
     try:
+        print(f"\n🚀 [ФОН] Начинаю генерацию маршрута для {data.login}...")
+
         db = await database.get_db()
+        if db is None:
+            print("❌ [ФОН] Ошибка: Нет подключения к базе данных MongoDB!")
+            return
+
         tags = data.collected_tags
 
-        # 1. Старт (Яндекс Геокодер)
+        print("📍 1. Получаю координаты старта через Яндекс...")
         start_point = await gisapi.GISService.get_coordinates_yandex(tags.start_location)
         if not start_point:
+            print("⚠️ Яндекс не нашел адрес, использую дефолтные координаты (Москва-Сити)")
             start_point = {"name": "Москва-Сити (По умолчанию)", "lat": 55.749, "lon": 37.539}
 
-        # 2. Поиск мест (2ГИС Catalog)
-        places = await gisapi.GISService.get_places_by_tags(
-            start_point["lat"], start_point["lon"], tags.categories
-        )
+        print("🏢 2. Ищу места по тегам через 2GIS...")
+        places = await gisapi.GISService.get_places_by_tags(start_point["lat"], start_point["lon"], tags.categories)
+        print(f"✅ Найдено мест: {len(places)}")
 
-        # 3. Коммивояжер (2ГИС Матрица)
-        optimized_route = await gisapi.GISService.solve_tsp_2gis(
-            start_point, places, tags.transport_mode
-        )
+        print("🗺️ 3. Решаю задачу Коммивояжера (Матрица 2GIS)...")
+        optimized_route = await gisapi.GISService.solve_tsp_2gis(start_point, places, tags.transport_mode)
 
-        # 4. Расписание (Яндекс)
+        print("🚌 4. Собираю расписание транспорта (Яндекс)...")
         route_steps = []
         for i in range(len(optimized_route) - 1):
             curr_p, next_p = optimized_route[i], optimized_route[i + 1]
             step = {"from": curr_p, "to": next_p, "schedule": []}
 
-            # Ищем расписание ТОЛЬКО для пешеходов
             if tags.transport_mode.lower() == "пешеход":
-                schedule = await gisapi.GISService.get_yandex_schedule(curr_p, next_p)
-                step["schedule"] = schedule
+                step["schedule"] = await gisapi.GISService.get_yandex_schedule(curr_p, next_p)
 
             route_steps.append(step)
 
-        # 5. Сохранение в БД
+        print("💾 5. Сохраняю маршрут в БД...")
         final_doc = {
             "login": data.login,
             "start_location": tags.start_location,
             "transport_mode": tags.transport_mode,
             "route_steps": route_steps,
-            "created_at": datetime.now(timezone.utc)
+            "created_at": datetime.now(timezone.utc).isoformat()
+            # Сохраняем как строку для избежания проблем с парсингом
         }
 
-        await db["generated_tours"].update_one(
-            {"login": data.login}, {"$set": final_doc}, upsert=True
-        )
-        print(f"✅ Тур для {data.login} успешно сгенерирован!")
+        await db["generated_tours"].update_one({"login": data.login}, {"$set": final_doc}, upsert=True)
+        print(f"🎉 [ФОН] Маршрут для {data.login} успешно создан и сохранен!\n")
 
     except Exception as e:
-        print(f"❌ Ошибка генерации тура: {e}")
+        print(f"❌ [ФОН] КРИТИЧЕСКАЯ ОШИБКА ГЕНЕРАЦИИ: {e}")
 
 
-@app.post("/api/receive_tour_data", summary="Вебхук: Принять данные от LLM и начать генерацию маршрута")
+@app.post("/api/receive_tour_data")
 async def receive_webhook(data: TourCollectedData, background_tasks: BackgroundTasks):
-    """
-    Сюда LLM-сервер (или фронтенд) присылает распознанные теги.
-    Сервер мгновенно отвечает 200 OK, а сам сбор данных по API происходит в фоне.
-    """
     background_tasks.add_task(generate_tour_background, data)
-    return {"status": "success", "message": "Процесс создания тура запущен в фоне"}
+    return {"status": "success", "message": "Процесс создания тура запущен в фоне, проверьте логи сервера"}
 
 
-@app.get("/api/get_user_route/{login}", summary="Получить готовый маршрут пользователя")
+@app.get("/api/get_user_route/{login}")
 async def get_user_route(login: str):
-    """
-    Фронтенд периодически дергает этот эндпоинт, чтобы забрать готовый маршрут.
-    """
-    db = await database.get_db()
-    tour = await db["generated_tours"].find_one({"login": login}, {"_id": 0})
-    if not tour:
-        return JSONResponse(status_code=404, content={"message": "Маршрут еще генерируется или не найден"})
-    return tour
+    try:
+        db = await database.get_db()
+        if db is None:
+            return JSONResponse(status_code=503, content={"message": "Сервис временно недоступен (Нет связи с БД)"})
+
+        tour = await db["generated_tours"].find_one({"login": login}, {"_id": 0})
+
+        if not tour:
+            return JSONResponse(status_code=404, content={"message": "Маршрут еще генерируется или не найден"})
+
+        return tour
+    except Exception as e:
+        print(f"❌ Ошибка в get_user_route: {e}")
+        return JSONResponse(status_code=500, content={"message": f"Внутренняя ошибка сервера: {str(e)}"})
 
 
 if __name__ == "__main__":
