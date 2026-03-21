@@ -106,7 +106,7 @@ async def generate_tour_background(data: TourCollectedData):
             # Сохраняем как строку для избежания проблем с парсингом
         }
 
-        await db["generated_tours"].update_one({"login": data.login}, {"$set": final_doc}, upsert=True)
+        await db["Places"].update_one({"login": data.login}, {"$set": final_doc}, upsert=True)
         print(f"🎉 [ФОН] Маршрут для {data.login} успешно создан и сохранен!\n")
 
     except Exception as e:
@@ -126,7 +126,7 @@ async def get_user_route(login: str):
         if db is None:
             return JSONResponse(status_code=503, content={"message": "Сервис временно недоступен (Нет связи с БД)"})
 
-        tour = await db["generated_tours"].find_one({"login": login}, {"_id": 0})
+        tour = await db["Places"].find_one({"login": login}, {"_id": 0})
 
         if not tour:
             return JSONResponse(status_code=404, content={"message": "Маршрут еще генерируется или не найден"})
