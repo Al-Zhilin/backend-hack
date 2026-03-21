@@ -19,7 +19,7 @@ load_dotenv()
 YANDEX_GEO_KEY = os.getenv("YANDEX_GEOCODER_API_KEY")
 YANDEX_RASP_KEY = os.getenv("YANDEX_RASP_API_KEY")
 DGIS_KEY = os.getenv("DGis_API_KEY")
-BASE_LOCAL_URL = "https://ratable-convalescently-epifania.ngrok-free.dev"
+BASE_LOCAL_URL = os.getenv("BASE_OF_LOCAL_URL")
 
 # Схемы данных (строгие)
 class Segment(BaseModel):
