@@ -58,45 +58,82 @@ class GISService:
 
     @staticmethod
     async def solve_tsp_2gis(start_point: dict, places: List[dict], transport_mode: str) -> List[dict]:
-        if not places: return [start_point]
+        if not places:
+            return [start_point]
 
         points = [start_point] + places
-        points_coords = [{"lat": p["lat"], "lon": p["lon"]} for p in points]
+
+        # 1. Жестко приводим координаты к типу float (API 2GIS очень строгое)
+        try:
+            points_coords = [{"lat": float(p["lat"]), "lon": float(p["lon"])} for p in points]
+        except ValueError as e:
+            print(f"❌ Ошибка: координаты переданы не как числа! {e}")
+            return points  # Возвращаем как есть
+
         indices = list(range(len(points_coords)))
 
-        profile = "driving" if transport_mode.lower() in ["машина", "авто"] else "pedestrian"
+        # 2. Матрица 2GIS поддерживает только driving (авто) и pedestrian (пешком)
+        # Если придет "транспорт" или "автобус", 2GIS выдаст ошибку 400.
+        transport_mode = transport_mode.lower()
+        if transport_mode in ["машина", "авто", "driving", "car"]:
+            profile = "driving"
+        else:
+            profile = "pedestrian"  # По умолчанию всегда пешком, чтобы не было ошибок
 
-        payload = {"points": points_coords, "sources": indices, "targets": indices, "profile": profile,
-                   "type": "shortest"}
+        payload = {
+            "points": points_coords,
+            "sources": indices,
+            "targets": indices,
+            "profile": profile,
+            "type": "shortest"
+        }
 
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.post(f"{DGIS_MATRIX_URL}?key={DGIS_KEY}", json=payload)
+                # ВАЖНО: Убедитесь, что DGIS_KEY реально загружается из .env!
+                url = f"{DGIS_MATRIX_URL}?key={DGIS_KEY}"
+                print(f"📡 Отправляю запрос в 2GIS Matrix (профиль: {profile})...")
+
+                resp = await client.post(url, json=payload, timeout=15.0)
+
                 if resp.status_code != 200:
-                    print(f"❌ Ошибка 2GIS Matrix: {resp.text}")
+                    # ВЫВОДИМ ТОЧНУЮ ОШИБКУ ОТ 2ГИС В ЛОГИ
+                    print(f"❌ Ошибка 2GIS Matrix (Код {resp.status_code}): {resp.text}")
+                    return points  # Возвращаем точки в исходном порядке, чтобы не ломать весь процесс
+
+                data = resp.json()
+                routes = data.get("routes", [])
+
+                if not routes:
+                    print("⚠️ 2GIS не вернул маршруты (возможно, точки слишком далеко или нет пути).")
                     return points
 
-                routes = resp.json().get("routes", [])
-                if not routes: return points
-
+                # 3. Собираем матрицу расстояний (duration - время в секундах)
                 matrix = {i: {j: float('inf') for j in indices} for i in indices}
                 for r in routes:
-                    matrix[r["source_id"]][r["target_id"]] = r["duration"]
+                    # Убеждаемся, что duration это число
+                    duration = r.get("duration", float('inf'))
+                    matrix[r["source_id"]][r["target_id"]] = duration
 
+                # 4. Простой жадный алгоритм для Коммивояжера
                 ordered = [points[0]]
                 unvisited = set(indices[1:])
                 curr_idx = 0
 
                 while unvisited:
-                    next_idx = min(unvisited, key=lambda idx: matrix[curr_idx][idx])
+                    # Находим ближайшую непосещенную точку
+                    next_idx = min(unvisited, key=lambda idx: matrix[curr_idx].get(idx, float('inf')))
                     ordered.append(points[next_idx])
                     unvisited.remove(next_idx)
                     curr_idx = next_idx
 
+                print("✅ 2GIS Matrix успешно оптимизировал маршрут!")
                 return ordered
+
         except Exception as e:
-            print(f"❌ Исключение в Коммивояжере: {e}")
-            return points
+            print(f"❌ Исключение в Коммивояжере (solve_tsp_2gis): {e}")
+            return points  # Фолбек: возвращаем неоптимизированный список
+
 
     @staticmethod
     async def get_yandex_schedule(p1: dict, p2: dict) -> List[dict]:
