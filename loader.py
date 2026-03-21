@@ -3,13 +3,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Ключи
-YANDEX_GEO_KEY = os.getenv("YANDEX_GEOCODER_API_KEY")
-YANDEX_RASP_KEY = os.getenv("YANDEX_RASP_API_KEY")
-DGIS_KEY = os.getenv("DGis_API_KEY")
+# API Ключи (убедитесь, что они есть в вашем .env файле)
+YANDEX_GEO_KEY = os.getenv("YANDEX_GEOCODER_API_KEY", "ВАШ_КЛЮЧ")
+YANDEX_RASP_KEY = os.getenv("YANDEX_RASP_API_KEY", "ВАШ_КЛЮЧ")
+DGIS_KEY = os.getenv("DGis_API_KEY", "ВАШ_КЛЮЧ")
 
 # Настройки сервера с моделью
-BASE_LOCAL_URL = os.getenv("BASE_OF_LOCAL_URL")
+BASE_LOCAL_URL = os.getenv("BASE_OF_LOCAL_URL", "http://localhost:5000")
 
 # MongoDB
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
@@ -17,8 +17,6 @@ DB_NAME = "travel_generator_db"
 
 # API Эндпоинты 2ГИС
 DGIS_CATALOG_URL = "https://catalog.api.2gis.com/3.0/items"
-DGIS_ROUTING_URL = "https://routing.api.2gis.com/routing/7.0.0/global"
-DGIS_TRANSPORT_URL = "https://routing.api.2gis.com/public_transport/2.0"
 DGIS_MATRIX_URL = "https://routing.api.2gis.com/get_dist_matrix/2.0"
 
 # API Эндпоинты Яндекс

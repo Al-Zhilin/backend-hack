@@ -8,8 +8,12 @@ class MongoDB:
 db_instance = MongoDB()
 
 async def connect_to_mongo():
-    db_instance.client = AsyncIOMotorClient(MONGO_URI)
-    db_instance.db = db_instance.client[DB_NAME]
+    try:
+        db_instance.client = AsyncIOMotorClient(MONGO_URI)
+        db_instance.db = db_instance.client[DB_NAME]
+        print("✅ Успешное подключение к MongoDB")
+    except Exception as e:
+        print(f"❌ Ошибка подключения к MongoDB: {e}")
 
 async def close_mongo():
     if db_instance.client:
