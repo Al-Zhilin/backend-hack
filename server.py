@@ -41,7 +41,7 @@ class GenerateRouteRequest(BaseModel):
     login: str
     transport_mode: str
     start_point: StartPoint
-    selected_places: List[PlaceItem] = Field(..., description="Список мест, которые выбрал пользователь")
+    suggested_places: List[PlaceItem] = Field(..., description="Список мест, которые выбрал пользователь")
 
 class ChatRequest(BaseModel):
     login: str = Field(..., example="user123")
