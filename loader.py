@@ -12,8 +12,8 @@ DGIS_KEY = os.getenv("DGis_API_KEY", "ВАШ_КЛЮЧ")
 BASE_LOCAL_URL = os.getenv("BASE_OF_LOCAL_URL", "http://localhost:5000")
 
 # MongoDB
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
-DB_NAME = "travel_generator_db"
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = os.getenv("DB_NAME", "TourProject")
 
 # API Эндпоинты 2ГИС
 DGIS_CATALOG_URL = "https://catalog.api.2gis.com/3.0/items"
