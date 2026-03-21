@@ -4,9 +4,18 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
+from dotenv import load_dotenv
 
-YANDEX_GEOCODER_API_KEY = os.getenv("YANDEX_GEOCODER_API_KEY", "ВАШ_КЛЮЧ_ГЕОКОДЕРА")
-YANDEX_RASP_API_KEY = os.getenv("YANDEX_RASP_API_KEY", "ВАШ_КЛЮЧ_РАСПИСАНИЙ")
+load_dotenv()
+
+YANDEX_GEOCODER_API_KEY = os.getenv("YANDEX_GEOCODER_API_KEY")
+YANDEX_RASP_API_KEY = os.getenv("YANDEX_RASP_API_KEY")
+
+# Проверка, что ключи загрузились
+if not YANDEX_GEOCODER_API_KEY:
+    raise ValueError("YANDEX_GEOCODER_API_KEY не найден в .env файле")
+if not YANDEX_RASP_API_KEY:
+    raise ValueError("YANDEX_RASP_API_KEY не найден в .env файле")
 
 GEOCODER_URL = "https://geocode-maps.yandex.ru/1.x/"
 RASP_API_URL = "https://api.rasp.yandex.net/v3.0/search/"
