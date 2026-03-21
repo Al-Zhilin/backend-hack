@@ -8,9 +8,12 @@ class MongoDB:
 
 db_instance = MongoDB()
 
+
 async def connect_to_mongo():
     try:
-        # Добавлен таймаут 5 секунд, чтобы сервер не висел вечно
+        # ПРИНТ ДЛЯ ПРОВЕРКИ (Удалите потом)
+        print(f"DEBUG: Подключаюсь к адресу: {MONGO_URI}")
+
         db_instance.client = AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=5000)
         db_instance.db = db_instance.client[DB_NAME]
         # Проверяем жива ли база
