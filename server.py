@@ -1,32 +1,19 @@
 import httpx
 import database
 import gisapi
-from fastapi import FastAPI, Request, Response, HTTPException, Body
+from fastapi import FastAPI, Request, Response, HTTPException, Body, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from bson import ObjectId
 from datetime import datetime, timezone
 from loader import BASE_LOCAL_URL
 
 app = FastAPI(title="Transit & Tour Master")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-
 STATIC_DIR = Path(__file__).parent / "static"
-
-
-@app.get("/healthcheck")
-async def healthcheck():
-    return {"status": "ok", "service": "Transit & Tour Master"}
-
-
-@app.get("/api-docs", response_class=HTMLResponse)
-async def api_docs():
-    return FileResponse(STATIC_DIR / "docs.html")
 
 
 # --- Схемы данных ---
@@ -34,9 +21,10 @@ class TourCollectedData(BaseModel):
     login: str
     status: str
     collected_tags: Dict[str, Any]
+    # Ожидаем, что внутри collected_tags есть:
+    # "tags": ["музей", "парк"], "transport_mode": "pedestrian" (или "car"), "start_lat": float, "start_lon": float
 
 
-# --- Инициализация БД ---
 @app.on_event("startup")
 async def startup():
     await database.connect_to_mongo()
@@ -47,13 +35,15 @@ async def shutdown():
     await database.close_mongo()
 
 
-# --- 1. ПРОКСИ-ЭНДПОИНТЫ (BASE_LOCAL_URL) ---
+# --- ПРОКСИ-ЭНДПОИНТЫ НЯРОСЕТИ ---
 
 @app.post("/api/chat")
 async def proxy_chat(request: Request):
+    """Стриминг общения с нейромоделью"""
     body = await request.json()
 
     async def stream_generator():
+        # timeout=None важен для стриминга долгих ответов LLM
         async with httpx.AsyncClient() as client:
             async with client.stream("POST", f"{BASE_LOCAL_URL}/chat", json=body, timeout=None) as response:
                 async for chunk in response.aiter_text():
@@ -62,82 +52,77 @@ async def proxy_chat(request: Request):
     return StreamingResponse(stream_generator(), media_type="text/plain")
 
 
-@app.get("/api/get-panorama")
-async def proxy_panorama(lat: float, lon: float):
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{BASE_LOCAL_URL}/get-panorama", params={"lat": lat, "lon": lon})
-        return resp.json()
+# --- ЛОГИКА СБОРКИ ТУРА (ВЕБХУК) ---
 
-
-@app.get("/panorama-image/{file_id}")
-async def proxy_image(file_id: str):
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"{BASE_LOCAL_URL}/panorama-image/{file_id}")
-        if resp.status_code == 200:
-            return Response(content=resp.content, media_type="image/jpeg")
-        return JSONResponse(status_code=404, content={"message": "Not found"})
-
-
-# --- 2. НОВЫЕ ЭНДПОИНТЫ (ТУРЫ + БД ATLAS) ---
-
-@app.post("/api/v1/search-places")
-async def search_places(hotel_query: str, category: str, radius: int = 1500):
-    db = await database.get_db()
-    hotel, places = await gisapi.GISService.find_hotel_and_nearby(hotel_query, category, radius)
-
-    if not hotel: raise HTTPException(status_code=404, detail="Hotel not found")
-
-    # Сохраняем "черновики"
-    await db["temp_places"].delete_many({})
-    if places:
-        inserted = await db["temp_places"].insert_many(places)
-        for i, doc_id in enumerate(inserted.inserted_ids):
-            places[i]["_id"] = str(doc_id)
-
-    return {"hotel": hotel, "candidates": places}
-
-
-@app.post("/api/v1/build-tour")
-async def build_tour(hotel_data: dict = Body(...), selected_ids: list[str] = Body(...)):
+async def background_tour_builder(data: TourCollectedData):
+    """Фоновая задача: собирает данные по API и сохраняет готовый тур в БД"""
     db = await database.get_db()
 
-    # 1. Достаем из базы выбранные места
-    cursor = db["temp_places"].find({"_id": {"$in": [ObjectId(i) for i in selected_ids]}})
-    places = await cursor.to_list(length=None)
+    tags = data.collected_tags.get("tags", [])
+    mode = data.collected_tags.get("transport_mode", "car")
+    start_lat = data.collected_tags.get("start_lat", 55.7558)  # Дефолт, если не передали
+    start_lon = data.collected_tags.get("start_lon", 37.6173)
 
-    # 2. Решаем TSP
-    start_p = {"name": hotel_data["name"], "lat": hotel_data["point"]["lat"], "lon": hotel_data["point"]["lon"]}
-    optimized_path = gisapi.GISService.solve_tsp(start_p, places)
+    start_node = {"name": "Стартовая точка", "lat": start_lat, "lon": start_lon}
 
-    # 3. Строим дорогу
-    route_meta = await gisapi.GISService.get_road_route(optimized_path)
+    # 1. Ищем локации по тегам
+    places = await gisapi.GISService.find_places_by_tags(tags, start_lat, start_lon)
 
-    # 4. Сохраняем готовый тур
+    # 2. Решаем задачу коммивояжера
+    optimized_path = gisapi.GISService.solve_tsp(start_node, places)
+
+    # 3. Строим маршрут 2GIS
+    route_meta = await gisapi.GISService.get_road_route(optimized_path, transport_mode=mode)
+
+    # 4. Если пешеход — парсим расписание для отрезков (Яндекс)
+    schedules = []
+    if mode == "pedestrian" and len(optimized_path) > 1:
+        # Для примера берем расписание от 1-й до 2-й точки
+        p1, p2 = optimized_path[0], optimized_path[1]
+        sched = await gisapi.GISService.get_yandex_schedule(p1['lat'], p1['lon'], p2['lat'], p2['lon'])
+        schedules.append({"from": p1["name"], "to": p2["name"], "schedule": sched})
+
+    # 5. Сохраняем в MongoDB
     tour_doc = {
-        "user_hotel": hotel_data["name"],
+        "login": data.login,
+        "mode": mode,
         "route": optimized_path,
         "metrics": route_meta,
+        "schedules": schedules,
+        "status": "ready",
         "created_at": datetime.now(timezone.utc)
     }
-    res = await db["ready_tours"].insert_one(tour_doc)
-    tour_doc["_id"] = str(res.inserted_id)
 
-    return tour_doc
+    # Обновляем или создаем тур для пользователя
+    await db["user_tours"].update_one(
+        {"login": data.login},
+        {"$set": tour_doc},
+        upsert=True
+    )
+    print(f"Тур для {data.login} успешно собран и сохранен!")
 
-
-# --- 3. ВЕБХУКИ И ТРАНСПОРТ ---
 
 @app.post("/api/receive_tour_data")
-async def receive_webhook(data: TourCollectedData):
-    print(f"Пришел вебхук для {data.login}")
-    return {"status": "success"}
+async def receive_webhook(data: TourCollectedData, background_tasks: BackgroundTasks):
+    """Принимает данные от ML-сервера и запускает сборку в фоне"""
+    print(f"Пришел вебхук для {data.login}. Запускаем сборку тура...")
+
+    # Отдаем задачу в фон, чтобы моментально ответить ML-серверу 200 OK
+    background_tasks.add_task(background_tour_builder, data)
+
+    return {"status": "processing_started"}
 
 
-@app.get("/api/routes")
-async def get_routes(from_place: str, to_place: str):
-    # Здесь вызываем методы из gisapi.GISService (get_yandex_coords, fetch_2gis_transport)
-    # ... (ваша логика вызова) ...
-    return {"message": "Logic from gisapi applied"}
+@app.get("/api/get_tour/{login}")
+async def get_ready_tour(login: str):
+    """Фронтенд дергает этот эндпоинт, чтобы получить готовый маршрут"""
+    db = await database.get_db()
+    tour = await db["user_tours"].find_one({"login": login}, {"_id": 0})
+
+    if not tour:
+        return JSONResponse(status_code=202, content={"status": "processing", "message": "Тур еще собирается"})
+
+    return {"status": "success", "data": tour}
 
 
 if __name__ == "__main__":
