@@ -1,9 +1,8 @@
-const API_KEY = '4e3793a793924e688abe127ce6b0549e';
-const BASE_URL_V1 = 'https://api.geoapify.com/v1';
-const BASE_URL_V2 = 'https://api.geoapify.com/v2';
+const API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY as string;
+const BASE_URL_V1 = import.meta.env.VITE_GEOAPIFY_BASE_URL_V1 as string;
+const BASE_URL_V2 = import.meta.env.VITE_GEOAPIFY_BASE_URL_V2 as string;
 
 export const geoService = {
-  // 1. Построение маршрута (Routing API)
   async getRoute(points: { lat: number; lng: number }[]) {
     const waypoints = points.map((p) => `${p.lat},${p.lng}`).join('|');
     const response = await fetch(
@@ -12,7 +11,6 @@ export const geoService = {
     return await response.json();
   },
 
-  // 2. Матрица расстояний (Route Matrix API)
   async getMatrix(locations: { lat: number; lng: number }[]) {
     const body = {
       mode: 'drive',
@@ -28,7 +26,6 @@ export const geoService = {
     return await response.json();
   },
 
-  // 3. Геокодинг (Поиск координат по адресу)
   async geocode(text: string) {
     const response = await fetch(
       `${BASE_URL_V1}/geocode/search?text=${encodeURIComponent(text)}&apiKey=${API_KEY}`
@@ -36,9 +33,7 @@ export const geoService = {
     return await response.json();
   },
 
-  // 4. Поиск мест по границам (Places API V2)
   async getPlacesByBounds(filterRect: string) {
-    // Расширенный список категорий: достопримечательности, еда, парки, фермы и сыроварни
     const categories = [
       'tourism.attraction',
       'tourism.sights',
@@ -48,11 +43,10 @@ export const geoService = {
       'tourism.museum',
       'natural.beach',
       'entertainment',
-      'production.factory',       // Для сыроварен и производств
-      'commercial.food_and_drink' // Для фермерских лавок и рынков
+      'production.factory',
+      'commercial.food_and_drink'
     ].join(',');
 
-    // ВАЖНО: используем BASE_URL_V2 для фильтра rect
     const url = `${BASE_URL_V2}/places?categories=${categories}&filter=rect:${filterRect}&limit=50&apiKey=${API_KEY}`;
 
     const response = await fetch(url);
@@ -67,12 +61,12 @@ export const geoService = {
     return (data.features || []).map((feature: any) => ({
       id: feature.properties.place_id,
       name: feature.properties.name || feature.properties.address_line1 || 'Интересное место',
-      lat: feature.properties.lat, // Используем готовые lat/lon из свойств
+      lat: feature.properties.lat,
       lng: feature.properties.lon,
       description: feature.properties.formatted || '',
       address: feature.properties.address_line2 || '',
       placeTypes: feature.properties.categories || [],
-      vacationTypes: [], // Оставляем пустым для твоей внутренней логики скоринга
+      vacationTypes: [],
       activity: 'medium',
       rating: feature.properties.rating || 0,
       imageUrl: '', 
@@ -81,7 +75,6 @@ export const geoService = {
     }));
   },
 
-  // 5. Поиск мест с текстовым запросом (Places API V2)
   async searchPlaces(query: string, filterRect?: string) {
     let url = `${BASE_URL_V2}/places?text=${encodeURIComponent(query)}&apiKey=${API_KEY}`;
 

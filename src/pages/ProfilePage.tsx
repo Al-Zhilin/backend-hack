@@ -139,10 +139,10 @@ export default function ProfilePage(props: { profile: AuthProfile; onUpdate: (p:
       <div className="profileHeader">
         <div className="profileIdentity">
           <div className="avatar" aria-label="Аватар">
-            А
+            {(profile.interests?.displayName || profile.email || '?').charAt(0).toUpperCase()}
           </div>
           <div>
-            <div className="profileName">Анна Смирнова</div>
+            <div className="profileName">{profile.interests?.displayName || profile.email || 'Путешественник'}</div>
             <div style={{ opacity: 0.78, marginTop: 4, fontWeight: 750 }}>{profile.email}</div>
           </div>
         </div>

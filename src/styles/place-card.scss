@@ -1,0 +1,292 @@
+@use './variables.scss' as *;
+
+/* ── Compact card (lists, grids) ───────────────────────── */
+
+.placeCard {
+  border: 1px solid var(--border);
+  border-radius: $radius-lg;
+  background: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.placeCard--active {
+  border-color: rgba($color-accent, 0.65);
+  background: rgba($color-accent, 0.06);
+}
+
+.placeCardImg {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  display: block;
+}
+
+.placeCardBody {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.placeCardTitle {
+  font-weight: 1000;
+  font-size: 15px;
+}
+
+.placeCardDesc {
+  opacity: 0.88;
+  line-height: 1.35;
+  font-size: 13.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.placeCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.82;
+}
+
+.placeCardMetaRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.placeCardMetaLabel {
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.placeCardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.placeCardTag {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(255, 255, 255, 0.75);
+  font-weight: 800;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.placeCardTag--tour {
+  border-color: rgba($color-accent, 0.45);
+  background: rgba($color-accent, 0.1);
+}
+
+.placeCardTag--place {
+  border-color: rgba($color-accent-2, 0.55);
+  background: rgba($color-accent-2, 0.14);
+}
+
+.placeCardSeasons {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.placeCardSeason {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 750;
+  border: 1px solid rgba($color-accent, 0.3);
+  background: rgba($color-accent, 0.06);
+}
+
+.placeCardPrice {
+  font-weight: 900;
+  margin-top: 4px;
+}
+
+.placeCardActions {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* ── Full card (side panel) ────────────────────────────── */
+
+.placeCardFull {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.placeCardFull .placeCardTitle {
+  font-size: 18px;
+}
+
+.placeCardFullSlider {
+  border-radius: $radius-md;
+  overflow: hidden;
+  border: 1px solid rgba(2, 6, 23, 0.08);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.placeCardFullSlider--swipe {
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.placeCardFullSliderImg {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .placeCardFullSliderImg {
+    height: 180px;
+  }
+}
+
+.placeCardFullSliderControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+.placeCardFullSliderPill {
+  opacity: 0.75;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.placeCardFullSection {
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
+.placeCardFullSection b {
+  display: inline;
+}
+
+.placeCardFullRow {
+  margin-top: 6px;
+}
+
+.placeCardFullActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* ── Modal card ────────────────────────────────────────── */
+
+.placeCardModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.placeCardModal {
+  width: min(980px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: $radius-lg;
+  border: 1px solid var(--border);
+}
+
+.placeCardModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.placeCardModalTitle {
+  font-weight: 1000;
+  font-size: 20px;
+}
+
+.placeCardModalAddr {
+  opacity: 0.75;
+  margin-top: 4px;
+}
+
+.placeCardModalDesc {
+  margin-top: 12px;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+.placeCardModalGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .placeCardModalGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.placeCardModalInfoBlock {
+  border: 1px solid var(--border);
+  border-radius: $radius-md;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.placeCardModalInfoTitle {
+  font-weight: 900;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.placeCardModalPanorama {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: $radius-md;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+.placeCardModalPanoFallback {
+  padding: 16px;
+}
+
+.placeCardModalPanoFallback img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-top: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.placeCardModalLink {
+  display: inline-block;
+  margin-top: 12px;
+  color: $color-accent;
+  font-weight: 800;
+  text-decoration: underline;
+}

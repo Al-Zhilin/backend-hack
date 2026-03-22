@@ -1,0 +1,42 @@
+@use './variables.scss' as *;
+
+/* Десктоп 1280–1920: фиксированная высота карты тура */
+.tourMapWrap {
+  height: 520px;
+  border-radius: $radius-md;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  touch-action: manipulation;
+}
+
+.tourMapWrap--relative {
+  position: relative;
+}
+
+.tourMapPreloader {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.tourMapPreloader .preloader {
+  pointer-events: auto;
+}
+
+/* Планшет / мобилка: адаптивная высота */
+@media (max-width: 1279px) {
+  .tourMapWrap {
+    height: min(480px, 55vh);
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tourMapWrap {
+    height: min(420px, 50vh);
+    min-height: 240px;
+    border-radius: $radius-sm;
+  }
+}

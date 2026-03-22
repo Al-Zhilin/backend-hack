@@ -5,6 +5,11 @@ import type {
   SeasonId,
   VacationTypeId,
 } from '../types'
+import {
+  GEOAPIFY_CATEGORY_BATCHES,
+  geoCategoryToPlaceTypes,
+  categoriesFromFeatureProperties,
+} from './geoapifyPlaceMapping'
 
 export interface Location {
   id: string
@@ -41,114 +46,139 @@ export const KUBAN_BOUNDS = {
   maxLng: 41.8,
 }
 
-// API ключ для Geoapify
-const API_KEY = '4e3793a793924e688abe127ce6b0549e'
+const API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY as string
+const GEOAPIFY_V2 = import.meta.env.VITE_GEOAPIFY_BASE_URL_V2 as string
 
-// Только поддерживаемые категории Geoapify (из их списка)
-const SUPPORTED_CATEGORIES = [
-  'leisure.park',
-  'catering.restaurant',
-  'catering.cafe',
-  'catering.bar',
-  'building.tourism',
-  'building.historic',
-  'beach.beach_resort'
-];
+function collectPlaceTypesFromCategories(categories: string[]): PlaceTypeId[] {
+  const set = new Set<PlaceTypeId>()
+  for (const cat of categories) {
+    for (const t of geoCategoryToPlaceTypes(cat)) {
+      set.add(t)
+    }
+  }
+  return [...set]
+}
 
-// Маппинг категорий Geoapify → твои placeTypes
-const categoryMapping: Record<string, PlaceTypeId> = {
-  'leisure.park': 'reserves',
-  'catering.restaurant': 'cheese_farms', // Условно, так как отдельной категории для сыроварен в API нет
-  'catering.cafe': 'cheese_farms',
-  'catering.bar': 'wineries',
-  'building.tourism': 'reserves',
-  'building.historic': 'cossack_stations', // Исторические здания можно отнести к культуре/станицам
-  'beach.beach_resort': 'reserves',
-};
+function vacationAndMetaForTypes(uniquePlaceTypes: PlaceTypeId[]) {
+  const vacationTypes: VacationTypeId[] = []
+  if (uniquePlaceTypes.includes('wineries')) vacationTypes.push('wine', 'gastro')
+  if (uniquePlaceTypes.includes('cheese_farms')) vacationTypes.push('gastro', 'family')
+  if (uniquePlaceTypes.includes('restaurants_cafes')) vacationTypes.push('gastro', 'family')
+  if (uniquePlaceTypes.includes('kids_entertainment')) vacationTypes.push('family', 'active')
+  if (uniquePlaceTypes.includes('trekking_routes')) vacationTypes.push('active', 'mountains')
+  if (uniquePlaceTypes.includes('reserves')) vacationTypes.push('nature', 'wellness')
+  if (uniquePlaceTypes.includes('eco_farms')) vacationTypes.push('nature', 'gastro', 'family')
+  if (uniquePlaceTypes.includes('guest_houses')) vacationTypes.push('wellness', 'nature', 'family')
+  if (uniquePlaceTypes.includes('cultural_sites') || uniquePlaceTypes.includes('cossack_stations'))
+    vacationTypes.push('culture')
+  if (uniquePlaceTypes.includes('festivals')) vacationTypes.push('culture', 'family')
 
-// Загрузка реальных мест из Geoapify
-export const fetchRealLocations = async (): Promise<Location[]> => {
+  if (vacationTypes.length === 0) vacationTypes.push('nature', 'culture')
+
+  let activity: 'low' | 'medium' | 'high' = 'medium'
+  if (uniquePlaceTypes.includes('trekking_routes')) activity = 'high'
+  if (uniquePlaceTypes.includes('kids_entertainment')) activity = 'medium'
+  if (
+    uniquePlaceTypes.includes('wineries') ||
+    uniquePlaceTypes.includes('cheese_farms') ||
+    uniquePlaceTypes.includes('restaurants_cafes') ||
+    uniquePlaceTypes.includes('guest_houses')
+  )
+    activity = 'low'
+
+  let suitableFor: Array<'family' | 'elder' | 'freelancers' | 'friends' | 'couple'> = ['family', 'couple']
+  if (uniquePlaceTypes.includes('trekking_routes')) suitableFor = ['friends', 'couple']
+  else if (uniquePlaceTypes.includes('kids_entertainment')) suitableFor = ['family', 'couple', 'friends']
+  else if (uniquePlaceTypes.includes('wineries') || uniquePlaceTypes.includes('cheese_farms'))
+    suitableFor = ['family', 'couple', 'friends', 'elder']
+  else if (uniquePlaceTypes.includes('cultural_sites')) suitableFor = ['family', 'elder', 'couple', 'friends']
+
+  return {
+    vacationTypes: [...new Set(vacationTypes)] as VacationTypeId[],
+    activity,
+    suitableFor,
+  }
+}
+
+async function fetchGeoapifyBatch(categories: string[]): Promise<any[]> {
   const { minLng, minLat, maxLng, maxLat } = KUBAN_BOUNDS
-
-  const categories = SUPPORTED_CATEGORIES.join(',')
-
-  const url = `https://api.geoapify.com/v2/places?` +
-    `categories=${categories}&` +
+  const catParam = categories.join(',')
+  const url =
+    `${GEOAPIFY_V2}/places?` +
+    `categories=${catParam}&` +
     `filter=rect:${minLng},${minLat},${maxLng},${maxLat}&` +
-    `limit=50&` +
+    `limit=100&` +
     `apiKey=${API_KEY}`
 
+  const response = await fetch(url)
+  if (!response.ok) {
+    const err = await response.text()
+    console.warn('Geoapify batch failed:', categories[0], response.status, err.slice(0, 200))
+    return []
+  }
+  const data = await response.json()
+  return data.features || []
+}
+
+/** Несколько запросов по группам категорий → объединение без дубликатов */
+export const fetchRealLocations = async (): Promise<Location[]> => {
   try {
-    console.log('🌍 Fetching real places from Geoapify...')
-    console.log('🔍 URL:', url)
-    
-    const response = await fetch(url)
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ Response error:', errorText)
-      throw new Error(`Geoapify API error: ${response.status}`)
+    console.log('🌍 Fetching Kuban places from Geoapify (multi-category)...')
+
+    const batchResults = await Promise.all(GEOAPIFY_CATEGORY_BATCHES.map((batch) => fetchGeoapifyBatch(batch)))
+    const seen = new Set<string>()
+    const features: any[] = []
+
+    for (const list of batchResults) {
+      for (const feature of list) {
+        const props = feature.properties
+        const id = props.place_id || props.placeId || props.id
+        const key = id ? String(id) : `${feature.geometry?.coordinates?.join(',')}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        features.push(feature)
+      }
     }
 
-    const data = await response.json()
-    console.log(`✅ Loaded ${data.features?.length || 0} places from Geoapify`)
+    console.log(`✅ Geoapify: уникальных точек после слияния: ${features.length}`)
 
-    if (!data.features || data.features.length === 0) {
-      console.warn('⚠️ No places found, using fallback data')
+    if (!features.length) {
+      console.warn('⚠️ Нет точек, fallback')
       return getFallbackLocations()
     }
 
-    const locations: Location[] = data.features.map((feature: any, index: number) => {
+    const locations: Location[] = features.map((feature: any, index: number) => {
       const props = feature.properties
       const [lng, lat] = feature.geometry.coordinates
 
-      const placeTypes: PlaceTypeId[] = props.categories
-        ?.map((cat: string) => {
-          if (categoryMapping[cat]) return categoryMapping[cat]
-          if (cat.includes('park') || cat.includes('reserve')) return 'reserves'
-          if (cat.includes('restaurant') || cat.includes('cafe')) return 'cheese_farms'
-          if (cat.includes('bar')) return 'wineries'
-          if (cat.includes('beach')) return 'reserves'
-          return null
-        })
-        .filter(Boolean) || ['reserves']
+      const rawCats = categoriesFromFeatureProperties(props)
+      const placeTypes = collectPlaceTypesFromCategories(rawCats.length ? rawCats : ['leisure.park'])
+      const uniquePlaceTypes = placeTypes.length ? [...new Set(placeTypes)] : (['reserves'] as PlaceTypeId[])
 
-      const uniquePlaceTypes = [...new Set(placeTypes)]
+      const { vacationTypes, activity, suitableFor } = vacationAndMetaForTypes(uniquePlaceTypes)
 
-      const vacationTypes: VacationTypeId[] = []
-      if (uniquePlaceTypes.includes('wineries')) vacationTypes.push('wine', 'gastro')
-      if (uniquePlaceTypes.includes('trekking_routes')) vacationTypes.push('active', 'mountains')
-      if (uniquePlaceTypes.includes('reserves')) vacationTypes.push('nature', 'wellness')
-      if (uniquePlaceTypes.includes('cheese_farms')) vacationTypes.push('gastro', 'family')
-      
-      if (vacationTypes.length === 0) {
-        vacationTypes.push('nature', 'culture')
-      }
-
-      let activity: 'low' | 'medium' | 'high' = 'medium'
-      if (uniquePlaceTypes.includes('trekking_routes')) activity = 'high'
-      if (uniquePlaceTypes.includes('wineries') || uniquePlaceTypes.includes('cheese_farms')) activity = 'low'
-
-      let suitableFor: Array<'family' | 'elder' | 'freelancers' | 'friends' | 'couple'> = ['family', 'couple']
-      if (uniquePlaceTypes.includes('trekking_routes')) {
-        suitableFor = ['friends', 'couple']
-      } else if (uniquePlaceTypes.includes('wineries') || uniquePlaceTypes.includes('cheese_farms')) {
-        suitableFor = ['family', 'couple', 'friends', 'elder']
+      const priceHint = () => {
+        if (uniquePlaceTypes.includes('wineries')) return 'от 1000 ₽ (дегустация)'
+        if (uniquePlaceTypes.includes('trekking_routes')) return 'бесплатно / по программе'
+        if (uniquePlaceTypes.includes('cheese_farms')) return 'от 500 ₽'
+        if (uniquePlaceTypes.includes('restaurants_cafes')) return 'средний чек уточняйте'
+        if (uniquePlaceTypes.includes('kids_entertainment')) return 'от 500 ₽'
+        if (uniquePlaceTypes.includes('guest_houses')) return 'от 3000 ₽ / сутки'
+        return 'уточняйте'
       }
 
       return {
-        id: props.place_id || `geo-${index}`,
+        id: props.place_id || props.placeId || `geo-${index}`,
         name: props.name || props.address_line1?.split(',')[0] || 'Без названия',
         placeTypes: uniquePlaceTypes,
-        vacationTypes: [...new Set(vacationTypes)] as VacationTypeId[],
-        seasons: ['spring', 'summer', 'autumn'],
+        vacationTypes,
+        seasons: ['spring', 'summer', 'autumn', 'winter'],
         activity,
-        description: props.description || 
-                     props.address_line1 || 
-                     `Интересное место в Краснодарском крае: ${props.name || 'локация'}`,
-        photoUrl: `https://source.unsplash.com/featured/900x600?${encodeURIComponent(
-          props.name || 'kuban nature'
-        )}`,
+        description:
+          props.description ||
+          props.address_line1 ||
+          `Интересное место в Краснодарском крае: ${props.name || 'локация'}`,
+        photoUrl: `https://source.unsplash.com/featured/900x600?${encodeURIComponent(props.name || 'kuban nature')}`,
         lat,
         lng,
         suitableFor,
@@ -159,14 +189,10 @@ export const fetchRealLocations = async (): Promise<Location[]> => {
           phone: props.contact?.phone,
           site: props.website || props.datasource?.raw?.website,
         },
-        prices: uniquePlaceTypes.includes('wineries') ? 'от 1000 ₽ (дегустация)' : 
-                uniquePlaceTypes.includes('trekking_routes') ? 'бесплатно / по программе' : 
-                uniquePlaceTypes.includes('cheese_farms') ? 'от 500 ₽ (дегустация)' :
-                'уточняйте',
+        prices: priceHint(),
       }
     })
 
-    console.log(`🎉 Successfully processed ${locations.length} locations`)
     return locations
   } catch (error) {
     console.error('❌ Error fetching real locations:', error)
@@ -307,6 +333,10 @@ function enrichLocation(loc: Location): Location {
   if (loc.placeTypes.includes('wineries')) primaryQuery = 'wine'
   else if (loc.placeTypes.includes('festivals')) primaryQuery = 'festival'
   else if (loc.placeTypes.includes('cheese_farms') || loc.placeTypes.includes('eco_farms')) primaryQuery = 'farm'
+  else if (loc.placeTypes.includes('restaurants_cafes')) primaryQuery = 'food'
+  else if (loc.placeTypes.includes('guest_houses')) primaryQuery = 'hotel'
+  else if (loc.placeTypes.includes('kids_entertainment')) primaryQuery = 'family'
+  else if (loc.placeTypes.includes('cultural_sites')) primaryQuery = 'culture'
   else if (loc.placeTypes.includes('trekking_routes')) primaryQuery = 'mountains'
   else if (loc.placeTypes.includes('cossack_stations')) primaryQuery = 'culture'
   else if (loc.placeTypes.includes('reserves')) primaryQuery = 'nature'

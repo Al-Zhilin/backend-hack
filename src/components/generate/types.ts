@@ -7,6 +7,13 @@ export type TourPoint = {
   description: string
   tags: string[]
   photoUrl?: string
+  photos?: string[]
+  phone?: string
+  website?: string
+  prices?: string
+  seasonality?: string[]
+  workingHours?: string
+  panoramaAvailable?: boolean
 }
 
 export type Tour = {
@@ -15,6 +22,8 @@ export type Tour = {
   duration: number
   description: string
   price: string
+  tags: string[]
+  seasonality?: string[]
   points: TourPoint[]
 }
 
@@ -27,4 +36,23 @@ export type ChatMessage = {
   role: 'user' | 'assistant'
   text: string
 }
+
+/** Место, предложенное бэкендом (PlaceItem из OpenAPI) */
+export type SuggestedPlace = {
+  id: string
+  name: string
+  lat: number
+  lon: number
+  address: string
+  tag: string
+}
+
+export type FlowPhase =
+  | 'idle'
+  | 'chatting'
+  | 'polling_suggestions'
+  | 'suggestions_ready'
+  | 'generating_route'
+  | 'polling_route'
+  | 'route_ready'
 

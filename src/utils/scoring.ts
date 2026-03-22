@@ -76,7 +76,19 @@ export function pickRoutePlaceIds(locations: Location[], interests: Interests, d
   // избегаем повторения по ключевым типам.
   const keyTypeOf = (loc: Location): PlaceTypeId | null => {
     // приоритет “интересных” типов
-    const priority: PlaceTypeId[] = ['wineries', 'cheese_farms', 'eco_farms', 'cossack_stations', 'reserves', 'trekking_routes', 'festivals']
+    const priority: PlaceTypeId[] = [
+      'wineries',
+      'cheese_farms',
+      'eco_farms',
+      'restaurants_cafes',
+      'kids_entertainment',
+      'guest_houses',
+      'cultural_sites',
+      'cossack_stations',
+      'reserves',
+      'trekking_routes',
+      'festivals',
+    ]
     return priority.find((p) => loc.placeTypes.includes(p)) ?? null
   }
 

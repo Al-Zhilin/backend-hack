@@ -1,0 +1,137 @@
+@use './variables.scss' as *;
+
+.preloader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  color: var(--text);
+}
+
+.preloader--full {
+  min-height: 200px;
+  padding: 32px 20px;
+}
+
+.preloader--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(247, 248, 251, 0.88);
+  backdrop-filter: blur(4px);
+  border-radius: inherit;
+  padding: 16px;
+}
+
+.preloader--inline {
+  flex-direction: row;
+  gap: 10px;
+  min-height: unset;
+  padding: 8px 0;
+  justify-content: flex-start;
+}
+
+.preloader--compact {
+  padding: 8px 12px;
+  gap: 8px;
+  min-height: unset;
+}
+
+.preloader--corner {
+  position: absolute;
+  z-index: 25;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: row;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.12);
+  pointer-events: none;
+}
+
+.preloader-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba($color-accent, 0.2);
+  border-top-color: $color-accent;
+  border-radius: 50%;
+  animation: preloader-spin 0.75s linear infinite;
+}
+
+.preloader--inline .preloader-spinner,
+.preloader--compact .preloader-spinner,
+.preloader--corner .preloader-spinner {
+  width: 22px;
+  height: 22px;
+  border-width: 2px;
+}
+
+.preloader-label {
+  font-weight: 800;
+  font-size: 15px;
+  max-width: 280px;
+  line-height: 1.35;
+}
+
+.preloader-sublabel {
+  font-size: 13px;
+  opacity: 0.78;
+  max-width: 320px;
+  line-height: 1.35;
+}
+
+.preloader--inline .preloader-label,
+.preloader--compact .preloader-label,
+.preloader--corner .preloader-label {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+@keyframes preloader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Полноэкран / страница карты (совместимо с mapShell) */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.loadingContainer .preloader-spinner {
+  margin-bottom: 8px;
+}
+
+.loadingContainer h3 {
+  margin: 12px 0 8px;
+  font-size: 18px;
+}
+
+.loadingContainer p {
+  margin: 0;
+  opacity: 0.82;
+  max-width: 360px;
+  line-height: 1.45;
+}
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 32px;
+  text-align: center;
+}

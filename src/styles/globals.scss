@@ -1,5 +1,7 @@
 @use './variables.scss' as *;
 @use './auth.scss' as *;
+@use './responsive.scss' as *;
+@use './preloader.scss' as *;
 
 :root {
   color-scheme: light;

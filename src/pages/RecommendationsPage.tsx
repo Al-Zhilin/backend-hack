@@ -6,14 +6,13 @@ import type { Location } from '../data/locations'
 import { LOCATIONS } from '../data/locations'
 import { scoreLocation } from '../utils/scoring'
 import {
-  getLocationRussianTags,
   getLocationUserTagIds,
   deriveUserTagIdsFromInterests,
   type UserTagId,
   USER_TAGS,
 } from '../utils/userTagMapping'
 
-import PlaceModal from '../components/generate/PlaceModal'
+import { PlaceCardCompact, PlaceCardModal, locationToCardProps } from '../components/PlaceCard'
 
 import '../styles/recommendations.scss'
 
@@ -65,8 +64,11 @@ function durationForLocation(loc: Location) {
 
 function priceForLocation(loc: Location) {
   if (loc.placeTypes.includes('wineries')) return 'от 25 000 ₽'
+  if (loc.placeTypes.includes('guest_houses')) return 'от 22 000 ₽'
   if (loc.placeTypes.includes('trekking_routes')) return 'от 18 000 ₽'
   if (loc.placeTypes.includes('eco_farms') || loc.placeTypes.includes('cheese_farms')) return 'от 16 000 ₽'
+  if (loc.placeTypes.includes('restaurants_cafes') || loc.placeTypes.includes('kids_entertainment')) return 'от 14 000 ₽'
+  if (loc.placeTypes.includes('cultural_sites')) return 'от 13 000 ₽'
   return 'от 12 000 ₽'
 }
 
@@ -154,30 +156,10 @@ export default function RecommendationsPage(props: { profile: AuthProfile }) {
   const popularPicks = useMemo(() => visible.slice(0, 9), [visible])
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [modalPoint, setModalPoint] = useState<{
-    id: string
-    name: string
-    address: string
-    lat: number
-    lng: number
-    description: string
-    tags: string[]
-    photoUrl?: string
-  } | null>(null)
-
-  const modalTags = (loc: Location) => getLocationRussianTags(loc).slice(0, 5)
+  const [modalLocation, setModalLocation] = useState<Location | null>(null)
 
   const openModalForLocation = (loc: Location) => {
-    setModalPoint({
-      id: loc.id,
-      name: loc.name,
-      address: loc.address ?? '—',
-      lat: loc.lat,
-      lng: loc.lng,
-      description: loc.aiFullDescription ?? loc.description,
-      tags: modalTags(loc),
-      photoUrl: loc.photos?.[0] ?? loc.photoUrl,
-    })
+    setModalLocation(loc)
     setModalOpen(true)
   }
 
@@ -300,104 +282,53 @@ export default function RecommendationsPage(props: { profile: AuthProfile }) {
       <div style={{ marginTop: 18 }}>
         <div className="blockTitle">Персональные подборки</div>
         <div className="recoGrid personal">
-          {personalPicks.map((loc) => {
-            const photo = loc.photos?.[0] ?? loc.photoUrl
-            const duration = durationForLocation(loc)
-            const tags = getLocationRussianTags(loc).slice(0, 4)
-            return (
-              <div key={loc.id} className="recoCard">
-                <img className="recoCardImg" src={photo} alt={loc.name} />
-                <div className="recoCardBody">
-                  <div className="recoCardTitle">{loc.name}</div>
-                  <div style={{ opacity: 0.85, marginTop: 6, lineHeight: 1.35 }}>{loc.description}</div>
-                  <div className="recoChips">
-                    {tags.map((t) => (
-                      <span key={t} className="recoTag">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ opacity: 0.8, marginTop: 10, fontWeight: 850 }}>
-                    {duration} дн. • {priceForLocation(loc)}
-                  </div>
-                  <button type="button" className="primaryBtn" style={{ marginTop: 10 }} onClick={() => openModalForLocation(loc)}>
-                    Подробнее
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+          {personalPicks.map((loc) => (
+            <PlaceCardCompact
+              key={loc.id}
+              {...locationToCardProps(loc)}
+              prices={loc.prices ?? priceForLocation(loc)}
+              onAction={() => openModalForLocation(loc)}
+            />
+          ))}
         </div>
       </div>
 
       <div style={{ marginTop: 18 }}>
         <div className="blockTitle">Быстрые туры на выходные</div>
         <div className="recoRowScroll">
-          {weekendPicks.map((loc) => {
-            const photo = loc.photos?.[0] ?? loc.photoUrl
-            const duration = durationForLocation(loc)
-            const tags = getLocationRussianTags(loc).slice(0, 3)
-            return (
-              <div key={loc.id} className="recoCard" style={{ minWidth: 290, maxWidth: 340 }}>
-                <img className="recoCardImg" src={photo} alt={loc.name} style={{ height: 120 }} />
-                <div className="recoCardBody">
-                  <div className="recoCardTitle">{loc.name}</div>
-                  <div style={{ opacity: 0.85, marginTop: 6, lineHeight: 1.35 }}>{loc.description}</div>
-                  <div className="recoChips">
-                    {tags.map((t) => (
-                      <span key={t} className="recoTag">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ opacity: 0.8, marginTop: 10, fontWeight: 850 }}>
-                    {duration} дн. • {priceForLocation(loc)}
-                  </div>
-                  <button type="button" className="secondaryBtn" style={{ marginTop: 10 }} onClick={() => openModalForLocation(loc)}>
-                    Подробнее
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+          {weekendPicks.map((loc) => (
+            <div key={loc.id} style={{ minWidth: 290, maxWidth: 340 }}>
+              <PlaceCardCompact
+                {...locationToCardProps(loc)}
+                prices={loc.prices ?? priceForLocation(loc)}
+                onAction={() => openModalForLocation(loc)}
+              />
+            </div>
+          ))}
         </div>
       </div>
 
       <div style={{ marginTop: 18 }}>
         <div className="blockTitle">Популярные локации по вашим интересам</div>
         <div className="recoGrid popular">
-          {popularPicks.map((loc) => {
-            const photo = loc.photos?.[0] ?? loc.photoUrl
-            const duration = durationForLocation(loc)
-            const tags = getLocationRussianTags(loc).slice(0, 4)
-            return (
-              <div key={loc.id} className="recoCard">
-                <img className="recoCardImg" src={photo} alt={loc.name} />
-                <div className="recoCardBody">
-                  <div className="recoCardTitle">{loc.name}</div>
-                  <div style={{ opacity: 0.85, marginTop: 6, lineHeight: 1.35 }}>{loc.description}</div>
-                  <div className="recoChips">
-                    {tags.map((t) => (
-                      <span key={t} className="recoTag">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ opacity: 0.8, marginTop: 10, fontWeight: 850 }}>
-                    {duration} дн. • {priceForLocation(loc)}
-                  </div>
-                  <button type="button" className="primaryBtn" style={{ marginTop: 10 }} onClick={() => openModalForLocation(loc)}>
-                    Подробнее
-                  </button>
-                </div>
-              </div>
-            )
-          })}
+          {popularPicks.map((loc) => (
+            <PlaceCardCompact
+              key={loc.id}
+              {...locationToCardProps(loc)}
+              prices={loc.prices ?? priceForLocation(loc)}
+              onAction={() => openModalForLocation(loc)}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Модальное окно */}
-      <PlaceModal open={modalOpen} point={modalPoint as any} onClose={() => setModalOpen(false)} />
+      {modalLocation && (
+        <PlaceCardModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          {...locationToCardProps(modalLocation)}
+        />
+      )}
     </div>
   )
 }

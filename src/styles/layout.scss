@@ -74,18 +74,21 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .main {
   flex: 1 1 auto;
-  overflow: hidden;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .page {
   padding: 22px;
   max-width: $container-max;
   margin: 0 auto;
-  overflow: auto;
 }
 
 // Универсальная карточка для контента (контрастные поверхности без синего цвета).
@@ -177,5 +180,27 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Адаптив: мобилка 375–768px */
+@media (max-width: 768px) {
+  .page {
+    padding: 14px 14px 20px;
+  }
+
+  .appContainer {
+    padding: 0 12px;
+  }
+}
+
+/* Десктоп 1280–1920px: комфортная ширина контента */
+@media (min-width: 1280px) {
+  .page {
+    max-width: min(1400px, 92vw);
+  }
+
+  .appContainer {
+    max-width: min(1600px, 96vw);
+  }
 }
 

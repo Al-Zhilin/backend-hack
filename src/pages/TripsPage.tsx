@@ -51,7 +51,7 @@ export default function TripsPage() {
                 </div>
 
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {trip.routeVariants.map((v) => (
+                  {trip.routeVariants.map((v: GeneratedTrip['routeVariants'][number]) => (
                     <React.Fragment key={v.id}>
                       <button
                         type="button"
@@ -73,7 +73,7 @@ export default function TripsPage() {
               </div>
 
               <div style={{ marginTop: 10, opacity: 0.9 }}>
-                {trip.routeVariants[0]?.placeIds.slice(0, 4).map((id) => getLocName(id)).join(' → ')}
+                {trip.routeVariants[0]?.placeIds.slice(0, 4).map((id: string) => getLocName(id)).join(' → ')}
                 {trip.routeVariants[0]?.placeIds.length > 4 ? ' …' : ''}
               </div>
             </div>

@@ -1,0 +1,61 @@
+@use './variables.scss' as *;
+
+/*
+  Брейкпоинты:
+  - Десктоп: 1280px – 1920px (и шире)
+  - Мобилка / узкий планшет: 375px – 768px
+*/
+
+:root {
+  --page-pad: 22px;
+  --content-max: #{$container-max};
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --page-pad: 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --page-pad: 14px;
+  }
+
+  .card {
+    border-radius: $radius-md;
+  }
+}
+
+@media (max-width: 374px) {
+  :root {
+    --page-pad: 12px;
+  }
+}
+
+/* Сенсор: быстрый отклик на тап, удобные зоны нажатия */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  [role='button'],
+  .chip,
+  .filterChip {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(22, 163, 74, 0.12);
+  }
+
+  .primaryBtn,
+  .secondaryBtn,
+  .accentBtn,
+  .navItem,
+  .iconBtn {
+    min-height: 44px;
+  }
+
+  .chip,
+  .filterChip {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 14px;
+  }
+}

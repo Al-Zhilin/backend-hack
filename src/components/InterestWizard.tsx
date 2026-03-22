@@ -18,11 +18,15 @@ const VACATION_OPTIONS: Array<{ id: VacationTypeId; label: string }> = [
 
 const PLACE_OPTIONS: Array<{ id: PlaceTypeId; label: string }> = [
   { id: 'wineries', label: 'Винодельни' },
-  { id: 'cheese_farms', label: 'Сыроварни / фермы' },
-  { id: 'cossack_stations', label: 'Казачьи станицы' },
-  { id: 'eco_farms', label: 'Эко-фермы' },
-  { id: 'reserves', label: 'Заповедники' },
+  { id: 'cheese_farms', label: 'Сыроварни' },
+  { id: 'restaurants_cafes', label: 'Рестораны и кафе' },
+  { id: 'reserves', label: 'Природные парки и заповедники' },
+  { id: 'kids_entertainment', label: 'Детские развлекательные центры' },
+  { id: 'eco_farms', label: 'Фермерские хозяйства' },
+  { id: 'guest_houses', label: 'Гостевые дома / эко-отели' },
   { id: 'trekking_routes', label: 'Треккинговые маршруты' },
+  { id: 'cultural_sites', label: 'Музеи, станицы, памятники' },
+  { id: 'cossack_stations', label: 'Казачьи станицы' },
   { id: 'festivals', label: 'Фестивали' },
 ]
 

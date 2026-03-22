@@ -4,7 +4,7 @@ import { saveProfile } from '../utils/storage'
 import InterestWizard from './InterestWizard'
 
 // Вспомогательный компонент для тегов
-function Chips({ items }: { items: string[] }) {
+function Chips({ items, onDelete }: { items: string[]; onDelete?: (item: string) => void }) {
   if (!items || !items.length) return <div style={{ opacity: 0.5, fontSize: '0.9em' }}>Не указано</div>
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
@@ -17,10 +17,22 @@ function Chips({ items }: { items: string[] }) {
             border: '1px solid rgba(255,255,255,0.1)',
             background: 'rgba(255,255,255,0.05)',
             fontSize: '0.85em',
-            color: '#efefef'
+            color: '#efefef',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
           }}
         >
           {t}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(t)}
+              style={{ background: 'none', border: 'none', color: '#efefef', cursor: 'pointer', padding: 0, fontSize: '0.9em' }}
+            >
+              &times;
+            </button>
+          )}
         </span>
       ))}
     </div>
@@ -67,7 +79,8 @@ export default function Profile(props: { profile: AuthProfile; onUpdate: (p: Aut
     props.onUpdate(updated)
   }
 
-  const labels = useMemo(() => (interests ? normalizeLabels(interests) : null), [interests])
+  const _labels = useMemo(() => (interests ? normalizeLabels(interests) : null), [interests])
+  void _labels
 
   // Рендер для партнера остается без изменений
   if (profile.role === 'partner') { /* ... ваш код ... */ }

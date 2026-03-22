@@ -13,6 +13,9 @@ import PlaceSidePanelComponent from './PlaceSidePanel'
 import AtmosphereModal from './AtmosphereModal'
 
 import { YANDEX_MAPS_QUERY } from '../config/yandex'
+import { attachPlacemarkSelect } from '../utils/placemarkTouch'
+import { getPlacemarkOptionsForLocation, getRoutePlacemarkOptions, MAP_LEGEND_ITEMS } from '../utils/mapMarkers'
+import Preloader from './Preloader'
 import '../styles/map.scss'
 
 type TimelineItem = {
@@ -63,11 +66,13 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
 
   // 1. ИНИЦИАЛИЗАЦИЯ ДАННЫХ (ВСЕ ХУКИ В НАЧАЛЕ)
   const { locations: realLocations, loading, error } = useRealLocations();
-  const [allPlaces, setAllPlaces] = useState<Location[]>([]);
+  const [, setAllPlaces] = useState<Location[]>([]);
   
   const [selectedTags, setSelectedTags] = useState<TagChipId[]>([])
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
   const [atmosphereOpen, setAtmosphereOpen] = useState(false)
+  const [boundsLoading, setBoundsLoading] = useState(false)
+  const [routeLoading, setRouteLoading] = useState(false)
   const routePlaceCount = props.initialRoutePlaceIds?.length ?? 5
   const [routePlaceIds, setRoutePlaceIds] = useState<string[]>(() => props.initialRoutePlaceIds ?? [])
 
@@ -104,12 +109,13 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
     return filterLocationsByTagChips(realLocations, selectedTags)
   }, [realLocations, selectedTags, loading])
 
-  const mapCenter = useMemo(() => {
+  const _mapCenter = useMemo(() => {
     if (!visibleLocations.length) return [44.7, 37.0] as [number, number]
     const avgLat = visibleLocations.reduce((s, l) => s + l.lat, 0) / visibleLocations.length
     const avgLng = visibleLocations.reduce((s, l) => s + l.lng, 0) / visibleLocations.length
     return [avgLat, avgLng] as [number, number]
   }, [visibleLocations])
+  void _mapCenter
 
   const routeLocations = useMemo(() => {
     if (loading) return []
@@ -137,11 +143,7 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   const onPlacemarkInstanceRef = (placeId: string) => {
     return (inst: any) => {
       if (!inst) return
-      if (inst.__kubanClickAttached) return
-      inst.__kubanClickAttached = true
-      inst.events?.add?.('click', () => {
-        setSelectedPlaceId(placeId)
-      })
+      attachPlacemarkSelect(inst, () => setSelectedPlaceId(placeId))
     }
   }
   const debouncedBoundsChange = useRef<any>();
@@ -154,16 +156,19 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
       const map = event.get('target');
       const bounds = map.getBounds();
       const filterRect = `${bounds[0][1]},${bounds[0][0]},${bounds[1][1]},${bounds[1][0]}`;
-      
+
+      setBoundsLoading(true);
       try {
         const newPlaces = await geoService.getPlacesByBounds(filterRect);
-        setAllPlaces(prev => {
-          const existingIds = new Set(prev.map(p => p.id));
+        setAllPlaces((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
           const uniqueNew = newPlaces.filter((p: any) => !existingIds.has(p.id));
           return [...prev, ...uniqueNew];
         });
       } catch (e) {
-        console.error("Ошибка подгрузки точек:", e);
+        console.error('Ошибка подгрузки точек:', e);
+      } finally {
+        setBoundsLoading(false);
       }
     }, 500); // Задержка 500ms
   }, []);
@@ -171,12 +176,12 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   // 4. УСЛОВНЫЕ ВОЗВРАТЫ ДЛЯ ЭКРАНОВ ЗАГРУЗКИ И ОШИБОК (ПОСЛЕ ВСЕХ ХУКОВ)
   if (loading) {
     return (
-      <div className="mapShell">
-        <div className="loadingContainer">
-          <div className="spinner"></div>
-          <h3>Загрузка реальных мест Краснодарского края...</h3>
-          <p>Ищем достопримечательности, винодельни и природные объекты</p>
-        </div>
+      <div className="mapShell mapShell--centeredLoading">
+        <Preloader
+          variant="full"
+          label="Загрузка реальных мест Краснодарского края…"
+          sublabel="Запрос к Geoapify: винодельни, парки, кафе и другие точки в границах края"
+        />
       </div>
     )
   }
@@ -260,6 +265,18 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                 </button>
               )}
             </div>
+
+            <div className="mapLegend card" aria-label="Типы меток на карте">
+              <div className="mapLegendTitle">Типы мест</div>
+              <div className="mapLegendGrid">
+                {MAP_LEGEND_ITEMS.map((item) => (
+                  <div key={item.type} className="mapLegendRow">
+                    <span className="mapLegendDot" style={{ backgroundColor: item.color }} aria-hidden />
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="mapOverlayRightTop">
@@ -268,44 +285,60 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
             </button>
           </div>
 
-          <YMaps query={YANDEX_MAPS_QUERY} preload>
-            <YMap
-              onBoundsChange={handleBoundsChange}
-              defaultState={{ center: [45.035, 38.975], zoom: 8 }}
-              width="100%"
-              height="100%"
-              options={{ suppressMapOpenBlock: true }}
-            >
-              <TrafficControl />
+          <div className="mapMapWrap">
+            <YMaps query={YANDEX_MAPS_QUERY} preload>
+              <YMap
+                onBoundsChange={handleBoundsChange}
+                defaultState={{ center: [45.035, 38.975], zoom: 8 }}
+                width="100%"
+                height="100%"
+                options={{ suppressMapOpenBlock: true }}
+              >
+                <TrafficControl />
 
-              {routeLocations.length >= 2 && <SmartRoute locations={routeLocations} />}
+                {routeLocations.length >= 2 && (
+                  <SmartRoute locations={routeLocations} onLoadingChange={setRouteLoading} />
+                )}
 
               {clusterLocations.length > 0 && (
-                <Clusterer options={{ preset: 'islands#greenIcon', groupByCoordinates: false }}>
-                  {clusterLocations.map((loc) => (
-                    <Placemark
-                      key={loc.id}
-                      geometry={[loc.lat, loc.lng]}
-                      options={{ preset: 'islands#greenIcon' }}
-                      instanceRef={onPlacemarkInstanceRef(loc.id) as any}
-                    />
-                  ))}
+                <Clusterer options={{ preset: 'islands#circleDotIcon', groupByCoordinates: false }}>
+                  {clusterLocations.map((loc) => {
+                    const pm = getPlacemarkOptionsForLocation(loc)
+                    return (
+                      <Placemark
+                        key={loc.id}
+                        geometry={[loc.lat, loc.lng]}
+                        options={pm.options as any}
+                        properties={pm.properties as any}
+                        instanceRef={onPlacemarkInstanceRef(loc.id) as any}
+                      />
+                    )
+                  })}
                 </Clusterer>
               )}
 
-              {routeLocations.map((loc, idx) => (
-                <Placemark
-                  key={`${loc.id}_route_${idx}`}
-                  geometry={[loc.lat, loc.lng]}
-                  options={{ preset: 'islands#greenIcon' }}
-                  properties={{
-                    iconContent: `<div style="color:#ffffff;font-weight:900;">${idx + 1}</div>`,
-                  }}
-                  instanceRef={onPlacemarkInstanceRef(loc.id) as any}
-                />
-              ))}
-            </YMap>
-          </YMaps>
+              {routeLocations.map((loc, idx) => {
+                const pm = getRoutePlacemarkOptions(loc, idx)
+                return (
+                  <Placemark
+                    key={`${loc.id}_route_${idx}`}
+                    geometry={[loc.lat, loc.lng]}
+                    options={pm.options as any}
+                    properties={pm.properties as any}
+                    instanceRef={onPlacemarkInstanceRef(loc.id) as any}
+                  />
+                )
+              })}
+              </YMap>
+            </YMaps>
+
+            {boundsLoading && (
+              <Preloader variant="corner" label="Подгрузка мест в видимой области…" />
+            )}
+            {routeLoading && !boundsLoading && (
+              <Preloader variant="corner" label="Построение маршрута…" />
+            )}
+          </div>
 
           <div className="timelineOverlay">
             <div className="card timelineCard">
@@ -348,32 +381,61 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   )
 }
 
-function SmartRoute({ locations }: { locations: Location[] }) {
-  const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([]);
+function SmartRoute({
+  locations,
+  onLoadingChange,
+}: {
+  locations: Location[]
+  onLoadingChange?: (loading: boolean) => void
+}) {
+  const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([])
 
   useEffect(() => {
-    if (locations.length < 2) return;
-  
-    geoService.getRoute(locations.map(l => ({ lat: l.lat, lng: l.lng })))
-      .then(data => {
-        // Продвинутая обработка: склеиваем все части пути в один массив
-        // Geoapify может вернуть несколько сегментов в зависимости от типа пути
-        const features = data.features[0];
-        let rawCoords = [];
-        
-        if (features.geometry.type === 'LineString') {
-          rawCoords = features.geometry.coordinates;
-        } else if (features.geometry.type === 'MultiLineString') {
-          rawCoords = features.geometry.coordinates.flat();
-        }
-  
-        const coords = rawCoords.map((c: number[]) => [c[1], c[0]] as [number, number]);
-        setRouteGeometry(coords);
-      })
-      .catch(err => console.error("Маршрут не построился:", err));
-  }, [locations]);
+    if (locations.length < 2) {
+      onLoadingChange?.(false)
+      setRouteGeometry([])
+      return
+    }
 
-  if (routeGeometry.length === 0) return null;
+    let cancelled = false
+    onLoadingChange?.(true)
+
+    geoService
+      .getRoute(locations.map((l) => ({ lat: l.lat, lng: l.lng })))
+      .then((data) => {
+        if (cancelled) return
+        const features = data.features?.[0]
+        if (!features?.geometry) {
+          setRouteGeometry([])
+          return
+        }
+        let rawCoords: number[][] = []
+
+        if (features.geometry.type === 'LineString') {
+          rawCoords = features.geometry.coordinates
+        } else if (features.geometry.type === 'MultiLineString') {
+          rawCoords = features.geometry.coordinates.flat()
+        }
+
+        const coords = rawCoords.map((c: number[]) => [c[1], c[0]] as [number, number])
+        setRouteGeometry(coords)
+      })
+      .catch((err) => {
+        console.error('Маршрут не построился:', err)
+        if (!cancelled) setRouteGeometry([])
+      })
+      .finally(() => {
+        if (!cancelled) onLoadingChange?.(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // onLoadingChange — setState родителя, стабилен
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locations])
+
+  if (routeGeometry.length === 0) return null
 
   return (
     <Polyline

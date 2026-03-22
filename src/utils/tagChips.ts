@@ -1,4 +1,4 @@
-import type { Interests } from '../types'
+import type { Interests, PlaceTypeId } from '../types'
 import type { Location } from '../data/locations'
 
 export type TagChipId =
@@ -46,7 +46,7 @@ export const TAG_CHIPS: TagChip[] = [
   {
     id: 'gastro',
     label: 'Гастро',
-    matchesLocation: (loc) => loc.vacationTypes.includes('gastro'),
+    matchesLocation: (loc) => loc.vacationTypes.includes('gastro') || loc.placeTypes.includes('restaurants_cafes'),
     matchesUserInterests: (i) => hasAny(i.vacationTypes, ['gastro']),
     toInterestsHints: (i) => ({
       vacationTypes: i.vacationTypes.includes('gastro') ? ['gastro'] : [],
@@ -109,17 +109,27 @@ export const TAG_CHIPS: TagChip[] = [
   {
     id: 'culture',
     label: 'Культура',
-    matchesLocation: (loc) => loc.vacationTypes.includes('culture') || loc.placeTypes.includes('cossack_stations'),
-    matchesUserInterests: (i) => hasAny(i.vacationTypes, ['culture']) || hasAny(i.placeTypes, ['cossack_stations']),
+    matchesLocation: (loc) =>
+      loc.vacationTypes.includes('culture') ||
+      loc.placeTypes.includes('cossack_stations') ||
+      loc.placeTypes.includes('cultural_sites'),
+    matchesUserInterests: (i) =>
+      hasAny(i.vacationTypes, ['culture']) || hasAny(i.placeTypes, ['cossack_stations', 'cultural_sites']),
     toInterestsHints: (i) => ({
       vacationTypes: i.vacationTypes.includes('culture') ? ['culture'] : [],
-      placeTypes: i.placeTypes.includes('cossack_stations') ? ['cossack_stations'] : [],
+      placeTypes: [
+        ...(i.placeTypes.includes('cossack_stations') ? (['cossack_stations'] as PlaceTypeId[]) : []),
+        ...(i.placeTypes.includes('cultural_sites') ? (['cultural_sites'] as PlaceTypeId[]) : []),
+      ],
     }),
   },
   {
     id: 'family',
     label: 'Семейный',
-    matchesLocation: (loc) => loc.vacationTypes.includes('family') || loc.suitableFor.includes('family'),
+    matchesLocation: (loc) =>
+      loc.vacationTypes.includes('family') ||
+      loc.suitableFor.includes('family') ||
+      loc.placeTypes.includes('kids_entertainment'),
     matchesUserInterests: (i) => hasAny(i.vacationTypes, ['family']),
     toInterestsHints: (i) => ({
       vacationTypes: i.vacationTypes.includes('family') ? ['family'] : [],

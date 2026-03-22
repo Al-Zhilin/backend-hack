@@ -1,3 +1,4 @@
+import { PlaceCardCompact } from '../PlaceCard'
 import type { Tour } from './types'
 
 export default function TourCards(props: {
@@ -6,37 +7,44 @@ export default function TourCards(props: {
   onSelect: (tour: Tour) => void
 }) {
   if (!props.tours.length) {
-    return <div style={{ opacity: 0.7 }}>После генерации здесь появятся карточки туров (3-5 вариантов).</div>
+    return (
+      <div className="tourCardsEmpty">
+        <div className="tourCardsEmpty__icon" aria-hidden>
+          🗺️
+        </div>
+        <p className="tourCardsEmpty__title">Пока нет вариантов</p>
+        <p className="tourCardsEmpty__text">
+          Опишите поездку в чате слева — здесь появятся 3–5 карточек туров с маршрутом на карте.
+        </p>
+      </div>
+    )
   }
 
   return (
-    <div style={{ display: 'flex', gap: 10, overflow: 'auto', paddingBottom: 4 }}>
+    <div className="tourCardsStrip">
       {props.tours.map((tour) => {
         const active = tour.id === props.selectedTourId
         return (
-          <article
-            key={tour.id}
-            className="card"
-            style={{
-              minWidth: 280,
-              maxWidth: 360,
-              padding: 12,
-              border: active ? '1px solid rgba(22,163,74,0.65)' : undefined,
-              background: active ? 'rgba(22,163,74,0.09)' : undefined,
-            }}
-          >
-            <div style={{ fontWeight: 900 }}>{tour.title}</div>
-            <div style={{ opacity: 0.75, marginTop: 4 }}>
-              {tour.duration} дн. • {tour.price}
-            </div>
-            <div style={{ marginTop: 8, lineHeight: 1.3, opacity: 0.88 }}>{tour.description}</div>
-            <button type="button" className="primaryBtn" style={{ marginTop: 10 }} onClick={() => props.onSelect(tour)}>
-              Посмотреть маршрут
-            </button>
-          </article>
+          <div key={tour.id} style={{ minWidth: 300, maxWidth: 380 }}>
+            <PlaceCardCompact
+              name={tour.title}
+              description={tour.description}
+              photos={tour.points[0]?.photoUrl ? [tour.points[0].photoUrl] : []}
+              tags={tour.points.flatMap((p) => p.tags).filter((v, i, a) => a.indexOf(v) === i).slice(0, 4)}
+              tourTags={tour.tags?.slice(0, 3)}
+              prices={tour.price}
+              seasonality={tour.seasonality}
+              workingHours={undefined}
+              address={`${tour.duration} дн. • ${tour.points.length} мест`}
+              lat={tour.points[0]?.lat ?? 0}
+              lng={tour.points[0]?.lng ?? 0}
+              active={active}
+              onAction={() => props.onSelect(tour)}
+              actionLabel="Посмотреть маршрут"
+            />
+          </div>
         )
       })}
     </div>
   )
 }
-

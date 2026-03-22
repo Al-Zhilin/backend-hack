@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Map as YMap, Placemark, TrafficControl, YMaps } from '@pbe/react-yandex-maps'
 
 import type { Tour, TourPoint } from './types'
 import { YANDEX_MAPS_QUERY } from '../../config/yandex'
+import { attachPlacemarkSelect } from '../../utils/placemarkTouch'
+import '../../styles/tour-map.scss'
+import Preloader from '../Preloader'
 
 export default function TourMap(props: {
   tour: Tour | null
@@ -11,6 +14,7 @@ export default function TourMap(props: {
 }) {
   const mapRef = useRef<any>(null)
   const routeRef = useRef<any>(null)
+  const [routeBuilding, setRouteBuilding] = useState(false)
 
   const center = useMemo<[number, number]>(() => {
     if (!props.tour?.points.length) return [44.8, 38.5]
@@ -20,9 +24,17 @@ export default function TourMap(props: {
   }, [props.tour])
 
   useEffect(() => {
-    if (!mapRef.current || !props.tour || props.tour.points.length < 2) return
+    if (!mapRef.current || !props.tour || props.tour.points.length < 2) {
+      setRouteBuilding(false)
+      return
+    }
     const ymapsApi = mapRef.current?.constructor?.ymaps ?? (window as any).ymaps
-    if (!ymapsApi?.multiRouter?.MultiRoute) return
+    if (!ymapsApi?.multiRouter?.MultiRoute) {
+      setRouteBuilding(false)
+      return
+    }
+
+    setRouteBuilding(true)
 
     if (routeRef.current) {
       mapRef.current.geoObjects.remove(routeRef.current)
@@ -46,10 +58,13 @@ export default function TourMap(props: {
 
     mapRef.current.geoObjects.add(route)
     routeRef.current = route
+
+    const done = setTimeout(() => setRouteBuilding(false), 1200)
+    return () => clearTimeout(done)
   }, [props.tour, props.routeMode])
 
   return (
-    <div style={{ height: 520, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)' }}>
+    <div className="tourMapWrap tourMapWrap--relative">
       <YMaps query={YANDEX_MAPS_QUERY} preload>
         <YMap
           defaultState={{ center, zoom: 9 }}
@@ -74,14 +89,18 @@ export default function TourMap(props: {
                 balloonContentFooter: p.description,
               }}
               instanceRef={(inst: any) => {
-                if (!inst || inst.__pointClickBound) return
-                inst.__pointClickBound = true
-                inst.events?.add?.('click', () => props.onPickPoint(p))
+                if (!inst) return
+                attachPlacemarkSelect(inst, () => props.onPickPoint(p))
               }}
             />
           ))}
         </YMap>
       </YMaps>
+      {routeBuilding && (
+        <div className="tourMapPreloader">
+          <Preloader variant="overlay" label="Построение маршрута Яндекс.Карт…" sublabel="Подождите, пока пересчитается дорога" />
+        </div>
+      )}
     </div>
   )
 }
