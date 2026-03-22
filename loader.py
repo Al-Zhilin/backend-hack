@@ -3,13 +3,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Ключи (убедитесь, что они есть в вашем .env файле)
+# API Ключи
 YANDEX_GEO_KEY = os.getenv("YANDEX_GEOCODER_API_KEY", "ВАШ_КЛЮЧ")
 YANDEX_RASP_KEY = os.getenv("YANDEX_RASP_API_KEY", "ВАШ_КЛЮЧ")
 DGIS_KEY = os.getenv("DGis_API_KEY", "ВАШ_КЛЮЧ")
 
-# Настройки сервера с моделью
+# Настройки серверов
 BASE_LOCAL_URL = os.getenv("BASE_OF_LOCAL_URL", "http://localhost:5000")
+# ДОБАВЛЕНО: URL сервера для генерации панорам
+OPENCV_SERVER_URL = BASE_LOCAL_URL
 
 # MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
