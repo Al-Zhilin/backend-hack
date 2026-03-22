@@ -4,8 +4,9 @@ import type { AuthProfile } from '../../types'
 import ChatInput from './ChatInput'
 import PlaceModal from './PlaceModal'
 import TourMap from './TourMap'
-import type { ChatMessage, FlowPhase, SuggestedPlace, Tour, TourPoint } from './types'
+import type { ChatMessage, FlowPhase, RouteStep, SuggestedPlace, Tour, TourPoint } from './types'
 import { enrichTourPoints } from '../../services/enrichment'
+import { loadTrips, saveTrips } from '../../utils/storage'
 import Preloader from '../Preloader'
 import '../../styles/generate.scss'
 
@@ -21,6 +22,60 @@ function makeId(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 8)}_${Date.now()}`
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+type RouteEstimate = {
+  totalKm: number
+  travelMinutes: number
+  visitMinutes: number
+  totalMinutes: number
+  costRub: number
+}
+
+function estimateRoute(
+  points: Array<{ lat: number; lng?: number; lon?: number }>,
+  mode: 'auto' | 'pedestrian' | 'bicycle',
+): RouteEstimate {
+  let totalKm = 0
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1]
+    totalKm += haversineKm(a.lat, a.lng ?? a.lon ?? 0, b.lat, b.lng ?? b.lon ?? 0)
+  }
+  totalKm *= 1.3
+
+  const speedKmH = mode === 'auto' ? 35 : mode === 'bicycle' ? 15 : 5
+  const travelMinutes = Math.round((totalKm / speedKmH) * 60)
+
+  const visitMinutes = points.length * 25
+
+  const totalMinutes = travelMinutes + visitMinutes
+
+  let costRub = 0
+  if (mode === 'auto') {
+    const fuelPer100 = 9
+    const fuelPrice = 58
+    costRub = Math.round((totalKm / 100) * fuelPer100 * fuelPrice)
+  } else if (mode === 'bicycle') {
+    costRub = 0
+  }
+
+  return { totalKm, travelMinutes, visitMinutes, totalMinutes, costRub }
+}
+
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} мин`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m ? `${h} ч ${m} мин` : `${h} ч`
+}
+
 function suggestedToTourPoint(sp: SuggestedPlace): TourPoint {
   return {
     id: sp.id,
@@ -33,12 +88,101 @@ function suggestedToTourPoint(sp: SuggestedPlace): TourPoint {
   }
 }
 
+function nodeToTourPoint(node: any, fallbackId: string): TourPoint {
+  return {
+    id: node.id || fallbackId,
+    name: node.name || 'Точка',
+    address: node.address || '',
+    lat: node.lat,
+    lng: node.lon ?? node.lng,
+    description: node.description || '',
+    tags: node.tag ? [node.tag] : (node.tags || []),
+    panoramaUrl: node.panorama_url,
+  }
+}
+
+function routeResponseToPoints(data: any): TourPoint[] {
+  if (Array.isArray(data.route_steps)) {
+    const steps = data.route_steps as RouteStep[]
+    const seen = new Set<string>()
+    const points: TourPoint[] = []
+    for (const step of steps) {
+      const fromKey = `${step.from.lat}_${step.from.lon}`
+      if (!seen.has(fromKey)) {
+        seen.add(fromKey)
+        points.push(nodeToTourPoint(step.from, makeId('p')))
+      }
+      const toKey = `${step.to.lat}_${step.to.lon}`
+      if (!seen.has(toKey)) {
+        seen.add(toKey)
+        points.push(nodeToTourPoint(step.to, makeId('p')))
+      }
+    }
+    return points
+  }
+
+  let raw: any[] = []
+  if (Array.isArray(data.points)) raw = data.points
+  else if (Array.isArray(data.route)) raw = data.route
+  else if (Array.isArray(data)) raw = data
+  return raw.map((p: any) => nodeToTourPoint(p, makeId('p')))
+}
+
 const POLL_SUGGESTIONS_INTERVAL = 3_000
 const POLL_SUGGESTIONS_MAX = 60
 const POLL_ROUTE_INTERVAL = 2_000
 const POLL_ROUTE_MAX = 45
 
-export default function GeneratePage(props: { profile: AuthProfile; onPickRoute: (placeIds: string[]) => void }) {
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  'музей': ['музе', 'выставк', 'галере'],
+  'кофейня': ['кофе', 'кафе', 'кафетер'],
+  'парк': ['парк', 'сквер', 'рощ', 'сад '],
+  'ресторан': ['рестора', 'еда', 'гастро', 'кухн'],
+  'пляж': ['пляж', 'мор', 'купа'],
+  'достопримечательность': ['экскурс', 'достопримечат', 'памятник', 'истори', 'культур'],
+  'природа': ['природ', 'гор', 'трек', 'поход', 'актив'],
+  'винодельня': ['вин', 'дегуста'],
+  'развлечения': ['развлеч', 'детск', 'семь', 'аттракцион'],
+}
+
+const TRANSPORT_KEYWORDS: Record<string, string[]> = {
+  'пешеход': ['пеш', 'прогул', 'ходь'],
+  'авто': ['машин', 'авто', 'такси', 'ехать'],
+  'общественный транспорт': ['общественн', 'автобус', 'трамвай', 'транспорт'],
+}
+
+const CITY_KEYWORDS: Record<string, string[]> = {
+  'Краснодар': ['краснодар'],
+  'Сочи': ['сочи', 'адлер'],
+  'Анапа': ['анап'],
+  'Геленджик': ['геленджик'],
+  'Новороссийск': ['новоросс'],
+  'Туапсе': ['туапсе'],
+}
+
+function extractTagsFromPrompt(prompt: string) {
+  const lower = prompt.toLowerCase()
+
+  const categories: string[] = []
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) categories.push(cat)
+  }
+  if (!categories.length) categories.push('достопримечательность', 'кофейня')
+
+  let transport = 'пешеход'
+  for (const [mode, keywords] of Object.entries(TRANSPORT_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) { transport = mode; break }
+  }
+
+  let city = 'Краснодар'
+  for (const [name, keywords] of Object.entries(CITY_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) { city = name; break }
+  }
+
+  return { start_location: city, transport_mode: transport, categories }
+}
+
+export default function GeneratePage(props: { profile: AuthProfile; onPickRoute: (points: TourPoint[]) => void }) {
   const login = props.profile.email ?? 'user'
 
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -53,12 +197,15 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
 
   const [suggestions, setSuggestions] = useState<SuggestedPlace[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [transportMode, setTransportMode] = useState<string>('auto')
+  const [startPoint, setStartPoint] = useState<{ name: string; lat: number; lon: number } | null>(null)
 
   const [tour, setTour] = useState<Tour | null>(null)
+  const routeRequestedAtRef = useRef('')
   const [selectedPoint, setSelectedPoint] = useState<TourPoint | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [routeMode, setRouteMode] = useState<'auto' | 'pedestrian'>('auto')
+  const [routeMode, setRouteMode] = useState<'auto' | 'pedestrian' | 'bicycle'>('pedestrian')
+  const routeModeRef = useRef(routeMode)
+  useEffect(() => { routeModeRef.current = routeMode }, [routeMode])
 
   const [chatDraft, setChatDraft] = useState('')
   const [lastPrompt, setLastPrompt] = useState('')
@@ -80,25 +227,34 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
 
       try {
         const res = await fetch(`${API_BASE}/api/get_suggestions/${encodeURIComponent(login)}`)
-        const raw = await res.text()
-        let data: any
-        try { data = JSON.parse(raw) } catch { data = { message: raw } }
 
-        if (data.message && typeof data.message === 'string' &&
-          (data.message.includes('подбираются') || data.message.includes('ожидании'))) {
+        if (res.status === 404) {
           await new Promise(r => setTimeout(r, POLL_SUGGESTIONS_INTERVAL))
           continue
         }
 
+        if (!res.ok) {
+          await new Promise(r => setTimeout(r, POLL_SUGGESTIONS_INTERVAL))
+          continue
+        }
+
+        const data = await res.json()
+
         let places: SuggestedPlace[] = []
         if (Array.isArray(data)) places = data
-        else if (Array.isArray(data.places)) places = data.places
         else if (Array.isArray(data.suggested_places)) places = data.suggested_places
+        else if (Array.isArray(data.places)) places = data.places
 
         if (places.length > 0) {
           setSuggestions(places)
           setSelectedIds(new Set(places.map(p => p.id)))
-          if (data.transport_mode) setTransportMode(data.transport_mode)
+          if (data.transport_mode) {
+            const lower = (data.transport_mode as string).toLowerCase()
+            if (lower.includes('пеш') || lower.includes('walk')) setRouteMode('pedestrian')
+            else if (lower.includes('вело') || lower.includes('bicycl')) setRouteMode('bicycle')
+            else if (lower.includes('авто') || lower.includes('drive') || lower.includes('машин')) setRouteMode('auto')
+          }
+          if (data.start_point) setStartPoint(data.start_point)
           setPhase('suggestions_ready')
           setMessages(prev => [
             ...prev,
@@ -130,30 +286,29 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
 
       try {
         const res = await fetch(`${API_BASE}/api/get_user_route/${encodeURIComponent(login)}`)
-        const raw = await res.text()
-        let data: any
-        try { data = JSON.parse(raw) } catch { data = { message: raw } }
 
-        if (data.message && typeof data.message === 'string' &&
-          (data.message.includes('не найден') || data.message.includes('генерируется') || data.message.includes('ожидании'))) {
+        if (res.status === 404) {
           await new Promise(r => setTimeout(r, POLL_ROUTE_INTERVAL))
           continue
         }
 
-        let rawPoints: any[] = []
-        if (Array.isArray(data.points)) rawPoints = data.points
-        else if (Array.isArray(data.route)) rawPoints = data.route
-        else if (Array.isArray(data)) rawPoints = data
+        if (!res.ok) {
+          await new Promise(r => setTimeout(r, POLL_ROUTE_INTERVAL))
+          continue
+        }
 
-        const points: TourPoint[] = rawPoints.map((p: any) => ({
-          id: p.id || makeId('p'),
-          name: p.name || 'Точка',
-          address: p.address || '',
-          lat: p.lat,
-          lng: p.lon ?? p.lng,
-          description: p.description || '',
-          tags: p.tag ? [p.tag] : (p.tags || []),
-        }))
+        const data = await res.json()
+
+        if (routeRequestedAtRef.current && data.created_at) {
+          const routeTime = new Date(data.created_at).getTime()
+          const requestTime = new Date(routeRequestedAtRef.current).getTime()
+          if (routeTime < requestTime) {
+            await new Promise(r => setTimeout(r, POLL_ROUTE_INTERVAL))
+            continue
+          }
+        }
+
+        const points = routeResponseToPoints(data)
 
         if (points.length) {
           const enriched = await enrichTourPoints(points)
@@ -165,10 +320,39 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
             price: data.price || '',
             tags: [],
             points: enriched,
+            schedule: data.schedule,
           }
           setTour(newTour)
           setPhase('route_ready')
-          props.onPickRoute(enriched.map(p => p.id))
+
+          try {
+            const currentMode = routeModeRef.current
+            const est = estimateRoute(enriched, currentMode)
+            const trip: import('../../types').GeneratedTrip = {
+              id: newTour.id,
+              createdAt: Date.now(),
+              season: 'any' as import('../../types').SeasonId,
+              days: Math.max(1, Math.ceil(est.totalMinutes / 480)),
+              routeVariants: [{
+                id: newTour.id,
+                title: newTour.title,
+                placeIds: enriched.map(p => p.id),
+                timeline: [],
+                keyPlaceIds: enriched.slice(0, 3).map(p => p.id),
+                score: 0,
+              }],
+              tourPoints: enriched.map(p => ({
+                id: p.id, name: p.name, address: p.address,
+                lat: p.lat, lng: p.lng, tags: p.tags,
+              })),
+              transportMode: currentMode === 'pedestrian' ? 'Пешком' : currentMode === 'bicycle' ? 'Велосипед' : 'Авто',
+              totalKm: Math.round(est.totalKm * 10) / 10,
+              totalMinutes: est.totalMinutes,
+            }
+            const existing = loadTrips()
+            saveTrips([...existing, trip])
+          } catch { /* не блокируем UI */ }
+
           return
         }
 
@@ -193,6 +377,7 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
     setLastPrompt(prompt)
     setSuggestions([])
     setSelectedIds(new Set())
+    setStartPoint(null)
     setTour(null)
 
     setMessages(prev => [...prev, { id: makeId('m'), role: 'user', text: prompt }])
@@ -217,7 +402,21 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
 
       setMessages(prev => [...prev, { id: makeId('m'), role: 'assistant', text: reply || 'Запрос обработан.' }])
 
+      const tags = extractTagsFromPrompt(prompt)
       setPhase('polling_suggestions')
+
+      try {
+        await fetch(`${API_BASE}/api/receive_tour_data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            login,
+            status: 'completed',
+            collected_tags: tags,
+          }),
+        })
+      } catch { /* бэкенд может быть медленным, не блокируем */ }
+
       const pollId = ++pollGenRef.current
       void pollSuggestions(pollId)
     } catch (e) {
@@ -235,8 +434,10 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
     setError(null)
     setPhase('generating_route')
 
+    routeRequestedAtRef.current = new Date().toISOString()
+
     const selected = suggestions.filter(p => selectedIds.has(p.id))
-    const start = selected[0]
+    const sp = startPoint ?? { name: selected[0].name, lat: selected[0].lat, lon: selected[0].lon }
 
     try {
       const res = await fetch(`${API_BASE}/api/generate_route`, {
@@ -244,8 +445,8 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           login,
-          transport_mode: transportMode,
-          start_point: { name: start.name, lat: start.lat, lon: start.lon },
+          transport_mode: routeMode === 'pedestrian' ? 'пешеход' : routeMode === 'bicycle' ? 'велосипед' : 'авто',
+          start_point: sp,
           suggested_places: selected,
         }),
       })
@@ -284,6 +485,12 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
       points: selected.map(suggestedToTourPoint),
     }
   }, [suggestions, selectedIds, tour, phase])
+
+  const routeEstimate = useMemo<RouteEstimate | null>(() => {
+    const pts = previewTour?.points
+    if (!pts || pts.length < 2) return null
+    return estimateRoute(pts, routeMode)
+  }, [previewTour, routeMode])
 
   /* ---------- render ---------- */
   const phaseLabel = (): { label: string; sublabel: string } => {
@@ -393,6 +600,22 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
               </div>
 
               <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div className="generateTransportSwitch">
+                  {([
+                    { value: 'auto', label: 'Авто', icon: '🚗' },
+                    { value: 'pedestrian', label: 'Пешком', icon: '🚶' },
+                    { value: 'bicycle', label: 'Велосипед', icon: '🚲' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`generateTransportSwitch__btn ${routeMode === opt.value ? 'generateTransportSwitch__btn--active' : ''}`}
+                      onClick={() => setRouteMode(opt.value)}
+                    >
+                      <span>{opt.icon}</span> {opt.label}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   className="primaryBtn"
@@ -401,19 +624,46 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
                 >
                   Построить маршрут ({selectedIds.size})
                 </button>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                  <span style={{ fontWeight: 700, opacity: 0.7 }}>Транспорт:</span>
-                  <select
-                    className="generateRouteSelect__control"
-                    value={transportMode}
-                    onChange={(e) => setTransportMode(e.target.value)}
-                  >
-                    <option value="auto">На машине</option>
-                    <option value="pedestrian">Пешком</option>
-                    <option value="public">Общественный</option>
-                  </select>
-                </label>
               </div>
+
+              {routeEstimate && (
+                <div className="routeEstimate">
+                  <div className="routeEstimate__item">
+                    <span className="routeEstimate__icon">📏</span>
+                    <span>{routeEstimate.totalKm.toFixed(1)} км</span>
+                  </div>
+                  <div className="routeEstimate__item">
+                    <span className="routeEstimate__icon">🚏</span>
+                    <span>В пути: {formatDuration(routeEstimate.travelMinutes)}</span>
+                  </div>
+                  <div className="routeEstimate__item">
+                    <span className="routeEstimate__icon">📍</span>
+                    <span>Осмотр: ~{formatDuration(routeEstimate.visitMinutes)}</span>
+                  </div>
+                  <div className="routeEstimate__item routeEstimate__item--total">
+                    <span className="routeEstimate__icon">⏱️</span>
+                    <span>Всего: ~{formatDuration(routeEstimate.totalMinutes)}</span>
+                  </div>
+                  {routeEstimate.costRub > 0 && (
+                    <div className="routeEstimate__item">
+                      <span className="routeEstimate__icon">⛽</span>
+                      <span>~{routeEstimate.costRub} ₽ на бензин</span>
+                    </div>
+                  )}
+                  {routeMode === 'pedestrian' && (
+                    <div className="routeEstimate__item routeEstimate__item--free">
+                      <span className="routeEstimate__icon">💚</span>
+                      <span>Бесплатно</span>
+                    </div>
+                  )}
+                  {routeMode === 'bicycle' && (
+                    <div className="routeEstimate__item routeEstimate__item--free">
+                      <span className="routeEstimate__icon">💚</span>
+                      <span>Бесплатно</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
@@ -441,6 +691,54 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
                     </div>
                   </div>
                 ))}
+              </div>
+              {routeEstimate && (
+                <div className="routeEstimate">
+                  <div className="routeEstimate__item">
+                    <span className="routeEstimate__icon">📏</span>
+                    <span>{routeEstimate.totalKm.toFixed(1)} км</span>
+                  </div>
+                  <div className="routeEstimate__item">
+                    <span className="routeEstimate__icon">🚏</span>
+                    <span>В пути: {formatDuration(routeEstimate.travelMinutes)}</span>
+                  </div>
+                  <div className="routeEstimate__item">
+                    <span className="routeEstimate__icon">📍</span>
+                    <span>Осмотр: ~{formatDuration(routeEstimate.visitMinutes)}</span>
+                  </div>
+                  <div className="routeEstimate__item routeEstimate__item--total">
+                    <span className="routeEstimate__icon">⏱️</span>
+                    <span>Всего: ~{formatDuration(routeEstimate.totalMinutes)}</span>
+                  </div>
+                  {routeEstimate.costRub > 0 && (
+                    <div className="routeEstimate__item">
+                      <span className="routeEstimate__icon">⛽</span>
+                      <span>~{routeEstimate.costRub} ₽ на бензин</span>
+                    </div>
+                  )}
+                  {routeEstimate.costRub === 0 && (
+                    <div className="routeEstimate__item routeEstimate__item--free">
+                      <span className="routeEstimate__icon">💚</span>
+                      <span>Бесплатно</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="primaryBtn"
+                  onClick={() => props.onPickRoute(tour.points)}
+                >
+                  Открыть на карте
+                </button>
+                <button
+                  type="button"
+                  className="secondaryBtn"
+                  onClick={() => { setTour(null); setPhase('suggestions_ready') }}
+                >
+                  Перегенерировать
+                </button>
               </div>
             </section>
           )}
@@ -470,17 +768,22 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
                 </p>
               </div>
               {tour && (
-                <label className="generateRouteSelect">
-                  <span className="generateRouteSelect__label">Режим</span>
-                  <select
-                    className="generateRouteSelect__control"
-                    value={routeMode}
-                    onChange={(e) => setRouteMode(e.target.value as 'auto' | 'pedestrian')}
-                  >
-                    <option value="auto">На машине</option>
-                    <option value="pedestrian">Пешком</option>
-                  </select>
-                </label>
+                <div className="generateTransportSwitch">
+                  {([
+                    { value: 'auto', label: 'Авто', icon: '🚗' },
+                    { value: 'pedestrian', label: 'Пешком', icon: '🚶' },
+                    { value: 'bicycle', label: 'Велосипед', icon: '🚲' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      className={`generateTransportSwitch__btn ${routeMode === opt.value ? 'generateTransportSwitch__btn--active' : ''}`}
+                      onClick={() => setRouteMode(opt.value)}
+                    >
+                      <span>{opt.icon}</span> {opt.label}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 

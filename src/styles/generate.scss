@@ -452,7 +452,7 @@
 .generateMapShell {
   display: flex;
   flex-direction: column;
-  min-height: min(480px, 50vh);
+  height: min(480px, 50vh);
   border-radius: $radius-md;
   overflow: hidden;
   border: 1px solid rgba(2, 6, 23, 0.08);
@@ -461,7 +461,6 @@
 .generateMapShell .tourMapWrap {
   flex: 1 1 auto;
   width: 100%;
-  min-height: min(480px, 50vh);
   height: 100%;
   border: none;
   border-radius: inherit;
@@ -656,11 +655,7 @@
   }
 
   .generateMapShell {
-    min-height: min(420px, 46vh);
-  }
-
-  .generateMapShell .tourMapWrap {
-    min-height: min(420px, 46vh);
+    height: min(420px, 46vh);
   }
 }
 
@@ -699,15 +694,81 @@
   }
 
   .generateMapShell {
-    min-height: min(340px, 42vh);
-  }
-
-  .generateMapShell .tourMapWrap {
-    min-height: min(340px, 42vh);
+    height: min(340px, 42vh);
   }
 
   .generatePanel {
     padding: 12px 12px 14px;
+  }
+}
+
+.routeEstimate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.18);
+  border-radius: 10px;
+}
+
+.routeEstimate__item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.routeEstimate__icon {
+  font-size: 15px;
+}
+
+.routeEstimate__item--total {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.routeEstimate__item--free {
+  color: #16a34a;
+}
+
+.generateTransportSwitch {
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.generateTransportSwitch__btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  &--active {
+    background: #16a34a;
+    color: #fff;
+
+    &:hover {
+      background: #15803d;
+    }
   }
 }
 

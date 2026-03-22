@@ -198,7 +198,7 @@ export default function App() {
                 path="/generate"
                 element={
                   interests ? (
-                    <RouteGenerator profile={profile} onPickRoute={(placeIds) => navigate('/map', { state: { placeIds } })} />
+                    <RouteGenerator profile={profile} onPickRoute={(tourPoints) => navigate('/map', { state: { tourPoints } })} />
                   ) : (
                     <div className="page">
                       Профиль партнёра пока не содержит интересов — перейдите в `Профиль`.

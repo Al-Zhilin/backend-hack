@@ -156,6 +156,17 @@ export interface GeneratedTrip {
     score: number
   }>
   pickedVariantId?: string
+  tourPoints?: Array<{
+    id: string
+    name: string
+    address: string
+    lat: number
+    lng: number
+    tags: string[]
+  }>
+  transportMode?: string
+  totalKm?: number
+  totalMinutes?: number
 }
 
 export interface Location {

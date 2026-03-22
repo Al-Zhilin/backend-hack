@@ -5,6 +5,7 @@ import { Clusterer, Map as YMap, Placemark, Polyline, TrafficControl, YMaps } fr
 import { useNavigate } from 'react-router-dom'
 import type { AuthProfile } from '../types'
 import type { Location } from '../data/locations'
+import type { TourPoint } from './generate/types'
 import { useRealLocations } from '../hooks/useRealLocations'
 import { pickRoutePlaceIds } from '../utils/scoring'
 import { buildInterestsFromTagChips, filterLocationsByTagChips, getAvailableTagChips, type TagChipId } from '../utils/tagChips'
@@ -60,7 +61,24 @@ function buildTimeline(placeIds: string[], locations: Location[], interests: Non
   return timeline
 }
 
-export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?: string[] }) {
+function tourPointToLocation(tp: TourPoint): Location {
+  return {
+    id: tp.id,
+    name: tp.name,
+    lat: tp.lat,
+    lng: tp.lng,
+    description: tp.description || '',
+    address: tp.address || '',
+    photoUrl: tp.photoUrl || '',
+    placeTypes: [],
+    vacationTypes: [],
+    seasons: [],
+    activity: 'medium',
+    suitableFor: [],
+  }
+}
+
+export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?: string[]; initialTourPoints?: TourPoint[] }) {
   const navigate = useNavigate()
   const interests = props.profile.interests
 
@@ -73,6 +91,12 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   const [atmosphereOpen, setAtmosphereOpen] = useState(false)
   const [boundsLoading, setBoundsLoading] = useState(false)
   const [routeLoading, setRouteLoading] = useState(false)
+  const [routeMode, setRouteMode] = useState<'drive' | 'walk' | 'bicycle'>('drive')
+  const externalRouteLocations = useMemo(() => {
+    if (!props.initialTourPoints?.length) return null
+    return props.initialTourPoints.map(tourPointToLocation)
+  }, [props.initialTourPoints])
+
   const routePlaceCount = props.initialRoutePlaceIds?.length ?? 5
   const [routePlaceIds, setRoutePlaceIds] = useState<string[]>(() => props.initialRoutePlaceIds ?? [])
 
@@ -118,16 +142,27 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   void _mapCenter
 
   const routeLocations = useMemo(() => {
+    if (externalRouteLocations) return externalRouteLocations
     if (loading) return []
     return routePlaceIds.map((id) => getById(id, realLocations)).filter(Boolean) as Location[]
-  }, [routePlaceIds, realLocations, loading])
+  }, [routePlaceIds, realLocations, loading, externalRouteLocations])
 
-  const routeDays = Math.max(1, routePlaceIds.length - 1)
+  const routeDays = Math.max(1, routeLocations.length - 1)
   
   const timeline = useMemo(() => {
+    if (externalRouteLocations) {
+      return externalRouteLocations.slice(0, -1).map((loc, i) => ({
+        day: i + 1,
+        fromPlaceId: loc.id,
+        toPlaceId: externalRouteLocations[i + 1].id,
+        transport: '🚶 Пешком',
+        stay: '',
+        food: '',
+      }))
+    }
     if (!interests || loading || realLocations.length === 0) return []
     return buildTimeline(routePlaceIds, realLocations, interests, routeDays)
-  }, [routePlaceIds, interests, routeDays, realLocations, loading])
+  }, [routePlaceIds, interests, routeDays, realLocations, loading, externalRouteLocations])
 
   const selectedPlace = useMemo(() => {
     if (!selectedPlaceId || loading) return null
@@ -280,6 +315,24 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
           </div>
 
           <div className="mapOverlayRightTop">
+            <div className="mapRouteMode">
+              {([
+                { value: 'drive', label: 'Авто', icon: '🚗' },
+                { value: 'walk', label: 'Пешком', icon: '🚶' },
+                { value: 'bicycle', label: 'Велосипед', icon: '🚲' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`mapRouteMode__btn ${routeMode === opt.value ? 'mapRouteMode__btn--active' : ''}`}
+                  onClick={() => setRouteMode(opt.value)}
+                  title={opt.label}
+                >
+                  <span className="mapRouteMode__icon">{opt.icon}</span>
+                  <span className="mapRouteMode__label">{opt.label}</span>
+                </button>
+              ))}
+            </div>
             <button type="button" className="primaryBtn" onClick={() => navigate('/generate')}>
               Сгенерировать тур
             </button>
@@ -289,7 +342,15 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
             <YMaps query={YANDEX_MAPS_QUERY} preload>
               <YMap
                 onBoundsChange={handleBoundsChange}
-                defaultState={{ center: [45.035, 38.975], zoom: 8 }}
+                defaultState={{
+                  center: externalRouteLocations?.length
+                    ? [
+                        externalRouteLocations.reduce((s, l) => s + l.lat, 0) / externalRouteLocations.length,
+                        externalRouteLocations.reduce((s, l) => s + l.lng, 0) / externalRouteLocations.length,
+                      ]
+                    : [45.035, 38.975],
+                  zoom: externalRouteLocations?.length ? 12 : 8,
+                }}
                 width="100%"
                 height="100%"
                 options={{ suppressMapOpenBlock: true }}
@@ -297,7 +358,7 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                 <TrafficControl />
 
                 {routeLocations.length >= 2 && (
-                  <SmartRoute locations={routeLocations} onLoadingChange={setRouteLoading} />
+                  <SmartRoute locations={routeLocations} mode={routeMode} onLoadingChange={setRouteLoading} />
                 )}
 
               {clusterLocations.length > 0 && (
@@ -348,8 +409,12 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
                   <div className="timelineItem" key={`${t.day}_${t.fromPlaceId}_${t.toPlaceId}`}>
                     <div className="timelineDay">День {t.day}</div>
                     <div className="timelineRoute">
-                      {(realLocations.find((l) => l.id === t.fromPlaceId)?.name ?? t.fromPlaceId) + ' → '}
-                      {realLocations.find((l) => l.id === t.toPlaceId)?.name ?? t.toPlaceId}
+                      {(routeLocations.find((l) => l.id === t.fromPlaceId)?.name
+                        ?? realLocations.find((l) => l.id === t.fromPlaceId)?.name
+                        ?? t.fromPlaceId) + ' → '}
+                      {routeLocations.find((l) => l.id === t.toPlaceId)?.name
+                        ?? realLocations.find((l) => l.id === t.toPlaceId)?.name
+                        ?? t.toPlaceId}
                     </div>
                     <div style={{ opacity: 0.8, marginTop: 8, fontSize: 13, lineHeight: 1.25 }}>
                       <div>🚗 {t.transport}</div>
@@ -383,9 +448,11 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
 
 function SmartRoute({
   locations,
+  mode = 'drive',
   onLoadingChange,
 }: {
   locations: Location[]
+  mode?: 'drive' | 'walk' | 'bicycle'
   onLoadingChange?: (loading: boolean) => void
 }) {
   const [routeGeometry, setRouteGeometry] = useState<[number, number][]>([])
@@ -401,7 +468,7 @@ function SmartRoute({
     onLoadingChange?.(true)
 
     geoService
-      .getRoute(locations.map((l) => ({ lat: l.lat, lng: l.lng })))
+      .getRoute(locations.map((l) => ({ lat: l.lat, lng: l.lng })), mode)
       .then((data) => {
         if (cancelled) return
         const features = data.features?.[0]
@@ -431,9 +498,8 @@ function SmartRoute({
     return () => {
       cancelled = true
     }
-    // onLoadingChange — setState родителя, стабилен
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locations])
+  }, [locations, mode])
 
   if (routeGeometry.length === 0) return null
 

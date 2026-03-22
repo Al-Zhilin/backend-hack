@@ -3,10 +3,10 @@ const BASE_URL_V1 = import.meta.env.VITE_GEOAPIFY_BASE_URL_V1 as string;
 const BASE_URL_V2 = import.meta.env.VITE_GEOAPIFY_BASE_URL_V2 as string;
 
 export const geoService = {
-  async getRoute(points: { lat: number; lng: number }[]) {
+  async getRoute(points: { lat: number; lng: number }[], mode: 'drive' | 'walk' | 'bicycle' = 'drive') {
     const waypoints = points.map((p) => `${p.lat},${p.lng}`).join('|');
     const response = await fetch(
-      `${BASE_URL_V1}/routing?waypoints=${waypoints}&mode=drive&optimize=true&apiKey=${API_KEY}`
+      `${BASE_URL_V1}/routing?waypoints=${waypoints}&mode=${mode}&optimize=true&apiKey=${API_KEY}`
     );
     return await response.json();
   },
