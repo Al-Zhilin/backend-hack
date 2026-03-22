@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { useHorizontalSwipe } from '../hooks/useSwipeGesture'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -6,6 +6,7 @@ import { Panorama, YMaps } from '@pbe/react-yandex-maps'
 import { YANDEX_MAPS_QUERY } from '../config/yandex'
 import type { Location } from '../data/locations'
 import { getLocationRussianTags } from '../utils/userTagMapping'
+import { addReview, getAverageRating, getReviewsForPlace, type PlaceReview } from '../utils/reviewsStorage'
 import '../styles/place-card.scss'
 
 export interface PlaceCardProps {
@@ -23,6 +24,11 @@ export interface PlaceCardProps {
   lat: number
   lng: number
   active?: boolean
+  /** Для действий с маршрутом на карте */
+  placeId?: string
+  routeInRoute?: boolean
+  onRouteAdd?: () => void
+  onRouteRemove?: () => void
 }
 
 const SEASON_LABELS: Record<string, string> = {
@@ -50,7 +56,78 @@ export function locationToCardProps(loc: Location): PlaceCardProps {
     workingHours: loc.workingHours,
     lat: loc.lat,
     lng: loc.lng,
+    placeId: loc.id,
   }
+}
+
+export function PlaceReviewsBlock(props: { placeId: string }) {
+  const [reviews, setReviews] = useState<PlaceReview[]>(() => getReviewsForPlace(props.placeId))
+  const [authorName, setAuthorName] = useState('')
+  const [rating, setRating] = useState(5)
+  const [text, setText] = useState('')
+  const avg = getAverageRating(props.placeId)
+
+  const refresh = useCallback(() => {
+    setReviews(getReviewsForPlace(props.placeId))
+  }, [props.placeId])
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (!text.trim()) return
+    addReview(props.placeId, authorName, rating, text)
+    setText('')
+    refresh()
+  }
+
+  return (
+    <div className="placeReviews">
+      <div className="placeReviews__title">Отзывы</div>
+      {avg != null && (
+        <div className="placeReviews__avg">
+          Средняя оценка: <strong>{avg.toFixed(1)}</strong> / 5
+        </div>
+      )}
+      <ul className="placeReviews__list">
+        {reviews.map((r) => (
+          <li key={r.id} className="placeReviews__item">
+            <div className="placeReviews__itemHead">
+              <span className="placeReviews__author">{r.authorName}</span>
+              <span className="placeReviews__stars">{`${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}`}</span>
+            </div>
+            <p className="placeReviews__text">{r.text}</p>
+          </li>
+        ))}
+      </ul>
+      {reviews.length === 0 && <div className="placeReviews__empty">Пока нет отзывов — будьте первым.</div>}
+      <form className="placeReviews__form" onSubmit={onSubmit}>
+        <div className="placeReviews__formRow">
+          <input
+            className="placeReviews__input"
+            placeholder="Ваше имя"
+            value={authorName}
+            onChange={(e) => setAuthorName(e.target.value)}
+          />
+          <select className="placeReviews__select" value={rating} onChange={(e) => setRating(Number(e.target.value))}>
+            {[5, 4, 3, 2, 1].map((n) => (
+              <option key={n} value={n}>
+                {n} ★
+              </option>
+            ))}
+          </select>
+        </div>
+        <textarea
+          className="placeReviews__textarea"
+          placeholder="Расскажите о впечатлениях"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={3}
+        />
+        <button type="submit" className="secondaryBtn placeReviews__submit">
+          Отправить отзыв
+        </button>
+      </form>
+    </div>
+  )
 }
 
 /* ────────────────────────────────────────────────────────
@@ -269,6 +346,20 @@ export function PlaceCardFull(
       )}
 
       <div className="placeCardFullActions">
+        {(props.onRouteAdd || props.onRouteRemove) && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', width: '100%' }}>
+            {!props.routeInRoute && props.onRouteAdd && (
+              <button type="button" className="primaryBtn secondaryBtnWide" onClick={props.onRouteAdd}>
+                Добавить в маршрут
+              </button>
+            )}
+            {props.routeInRoute && props.onRouteRemove && (
+              <button type="button" className="secondaryBtn secondaryBtnWide" onClick={props.onRouteRemove}>
+                Убрать из маршрута
+              </button>
+            )}
+          </div>
+        )}
         {props.onMore && (
           <button type="button" className="primaryBtn secondaryBtnWide" onClick={props.onMore}>
             Подробнее
@@ -391,6 +482,8 @@ export function PlaceCardModal(
                 )}
               </div>
             </div>
+
+            {props.placeId && <PlaceReviewsBlock placeId={props.placeId} />}
 
             <div className="placeCardModalPanorama">
               {!panoramaError ? (

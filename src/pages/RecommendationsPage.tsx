@@ -13,6 +13,7 @@ import {
 } from '../utils/userTagMapping'
 
 import { PlaceCardCompact, PlaceCardModal, locationToCardProps } from '../components/PlaceCard'
+import { effectiveRecommendationSeason, seasonFromDate } from '../utils/storage'
 
 import '../styles/recommendations.scss'
 
@@ -45,15 +46,6 @@ const MOODS: Array<{ id: MoodId; label: string }> = [
 
 function russianSeasonLabel(season: SeasonId) {
   return SEASON_OPTIONS.find((s) => s.id === season)?.label ?? 'Любой сезон'
-}
-
-function seasonFromDate(d: Date): SeasonId {
-  const m = d.getMonth() // 0-11
-  // приближенно: зима [11,0,1], весна [2,3,4], лето [5,6,7], осень [8,9,10]
-  if (m === 11 || m === 0 || m === 1) return 'winter'
-  if (m >= 2 && m <= 4) return 'spring'
-  if (m >= 5 && m <= 7) return 'summer'
-  return 'autumn'
 }
 
 function durationForLocation(loc: Location) {
@@ -125,7 +117,7 @@ export default function RecommendationsPage(props: { profile: AuthProfile }) {
   const navigate = useNavigate()
   const interests = props.profile.interests
 
-  const defaultSeason: SeasonId = interests?.season && interests.season !== 'any' ? interests.season : seasonFromDate(new Date())
+  const defaultSeason: SeasonId = interests ? effectiveRecommendationSeason(interests) : seasonFromDate(new Date())
 
   const [tagFilter, setTagFilter] = useState<UserTagId[]>(() => (interests ? deriveUserTagIdsFromInterests(interests) : []))
   const [availability, setAvailability] = useState<AvailabilityId[]>([])

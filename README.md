@@ -93,7 +93,6 @@
 | `/map` | InteractiveMap | Интерактивная карта |
 | `/generate` | RouteGenerator / GeneratePage | AI-генерация туров |
 | `/trips` | TripsPage | Мои путешествия |
-| `/history` | — | История поездок (заглушка) |
 | `/place/:id` | PlacePage | Детальная страница места |
 | `/pano` | Pano360View | 360°-панорама |
 | `/profile` | ProfilePage | Профиль и интересы |

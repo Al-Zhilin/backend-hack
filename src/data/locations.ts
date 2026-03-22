@@ -100,8 +100,10 @@ function vacationAndMetaForTypes(uniquePlaceTypes: PlaceTypeId[]) {
   }
 }
 
-async function fetchGeoapifyBatch(categories: string[]): Promise<any[]> {
-  const { minLng, minLat, maxLng, maxLat } = KUBAN_BOUNDS
+type RectBounds = { minLng: number; minLat: number; maxLng: number; maxLat: number }
+
+async function fetchGeoapifyBatch(categories: string[], bounds: RectBounds = KUBAN_BOUNDS): Promise<any[]> {
+  const { minLng, minLat, maxLng, maxLat } = bounds
   const catParam = categories.join(',')
   const url =
     `${GEOAPIFY_V2}/places?` +
@@ -120,6 +122,37 @@ async function fetchGeoapifyBatch(categories: string[]): Promise<any[]> {
   return data.features || []
 }
 
+function splitKubanGrid(rows: number, cols: number): RectBounds[] {
+  const { minLng, minLat, maxLng, maxLat } = KUBAN_BOUNDS
+  const out: RectBounds[] = []
+  const dLng = (maxLng - minLng) / cols
+  const dLat = (maxLat - minLat) / rows
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      out.push({
+        minLng: minLng + c * dLng,
+        minLat: minLat + r * dLat,
+        maxLng: minLng + (c + 1) * dLng,
+        maxLat: minLat + (r + 1) * dLat,
+      })
+    }
+  }
+  return out
+}
+
+/** Доп. выборка по ячейкам сетки (много запросов — только при VITE_GEOAPIFY_GRID_FETCH=true). */
+async function fetchGridSupplement(): Promise<any[]> {
+  const cells = splitKubanGrid(2, 2)
+  const all: any[] = []
+  for (const bounds of cells) {
+    const batchResults = await Promise.all(GEOAPIFY_CATEGORY_BATCHES.map((batch) => fetchGeoapifyBatch(batch, bounds)))
+    for (const list of batchResults) {
+      all.push(...list)
+    }
+  }
+  return all
+}
+
 /** Несколько запросов по группам категорий → объединение без дубликатов */
 export const fetchRealLocations = async (): Promise<Location[]> => {
   try {
@@ -129,7 +162,7 @@ export const fetchRealLocations = async (): Promise<Location[]> => {
     const seen = new Set<string>()
     const features: any[] = []
 
-    for (const list of batchResults) {
+    const mergeFeatures = (list: any[]) => {
       for (const feature of list) {
         const props = feature.properties
         const id = props.place_id || props.placeId || props.id
@@ -138,6 +171,14 @@ export const fetchRealLocations = async (): Promise<Location[]> => {
         seen.add(key)
         features.push(feature)
       }
+    }
+
+    for (const list of batchResults) mergeFeatures(list)
+
+    if (import.meta.env.VITE_GEOAPIFY_GRID_FETCH === 'true') {
+      console.log('🗺️ Geoapify: дополнительная сетка 2×2 по краю (GRID_FETCH)')
+      const extra = await fetchGridSupplement()
+      mergeFeatures(extra)
     }
 
     console.log(`✅ Geoapify: уникальных точек после слияния: ${features.length}`)

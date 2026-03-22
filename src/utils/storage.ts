@@ -1,4 +1,4 @@
-import type { AuthProfile, GeneratedTrip, SeasonId } from '../types'
+import type { AuthProfile, GeneratedTrip, Interests, SeasonId } from '../types'
 
 const KEY = 'kubanSmotry.profile.v1'
 const KEY_TRIPS = 'kubanSmotry.trips.v1'
@@ -57,5 +57,24 @@ export function formatSeason(season: SeasonId) {
     default:
       return 'Любой сезон'
   }
+}
+
+/** Текущий календарный сезон (как на странице рекомендаций при «любой сезон»). */
+export function seasonFromDate(d: Date): SeasonId {
+  const m = d.getMonth()
+  if (m === 11 || m === 0 || m === 1) return 'winter'
+  if (m >= 2 && m <= 4) return 'spring'
+  if (m >= 5 && m <= 7) return 'summer'
+  return 'autumn'
+}
+
+/** Фактический сезон для рекомендаций: выбранный или календарный, если выбран «любой». */
+export function effectiveRecommendationSeason(interests: Interests): SeasonId {
+  return interests.season && interests.season !== 'any' ? interests.season : seasonFromDate(new Date())
+}
+
+export function recommendationsNavSeasonLabel(interests: Interests | undefined): string {
+  if (!interests) return ''
+  return formatSeason(effectiveRecommendationSeason(interests))
 }
 

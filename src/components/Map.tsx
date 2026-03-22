@@ -71,10 +71,10 @@ function tourPointToLocation(tp: TourPoint): Location {
     address: tp.address || '',
     photoUrl: tp.photoUrl || '',
     placeTypes: [],
-    vacationTypes: [],
-    seasons: [],
+    vacationTypes: ['nature', 'culture'],
+    seasons: ['spring', 'summer', 'autumn', 'winter'],
     activity: 'medium',
-    suitableFor: [],
+    suitableFor: ['couple', 'family'],
   }
 }
 
@@ -92,35 +92,52 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   const [boundsLoading, setBoundsLoading] = useState(false)
   const [routeLoading, setRouteLoading] = useState(false)
   const [routeMode, setRouteMode] = useState<'drive' | 'walk' | 'bicycle'>('drive')
-  const externalRouteLocations = useMemo(() => {
-    if (!props.initialTourPoints?.length) return null
-    return props.initialTourPoints.map(tourPointToLocation)
+
+  const tourPointById = useMemo(() => {
+    const m = new globalThis.Map<string, Location>()
+    props.initialTourPoints?.forEach((tp) => m.set(tp.id, tourPointToLocation(tp)))
+    return m
   }, [props.initialTourPoints])
 
-  const routePlaceCount = props.initialRoutePlaceIds?.length ?? 5
-  const [routePlaceIds, setRoutePlaceIds] = useState<string[]>(() => props.initialRoutePlaceIds ?? [])
+  const hasInitialRoute = Boolean(props.initialRoutePlaceIds?.length || props.initialTourPoints?.length)
+  const [routeBuildMode, setRouteBuildMode] = useState<'auto' | 'manual'>(() => (hasInitialRoute ? 'manual' : 'auto'))
 
-  // 2. ЭФФЕКТЫ ДЛЯ ФОРМИРОВАНИЯ МАРШРУТА
+  const routePlaceCount = props.initialRoutePlaceIds?.length ?? 5
+  const [routePlaceIds, setRoutePlaceIds] = useState<string[]>(() => {
+    if (props.initialRoutePlaceIds?.length) return props.initialRoutePlaceIds
+    if (props.initialTourPoints?.length) return props.initialTourPoints.map((t) => t.id)
+    return []
+  })
+
+  const getLocationForRoute = useCallback(
+    (id: string): Location | null => {
+      return realLocations.find((l) => l.id === id) ?? tourPointById.get(id) ?? null
+    },
+    [realLocations, tourPointById],
+  )
+
+  // 2. ЭФФЕКТЫ ДЛЯ ФОРМИРОВАНИЯ МАРШРУТА (только автоматический режим)
   useEffect(() => {
-    // Если еще грузимся или данных нет — ничего не делаем, но хук зарегистрирован!
     if (loading || !interests || realLocations.length === 0) return
+    if (routeBuildMode !== 'auto') return
     if (props.initialRoutePlaceIds?.length) return
 
     const candidates = filterLocationsByTagChips(realLocations, selectedTags)
     const nextInterests = buildInterestsFromTagChips(interests, selectedTags)
     const picked = pickRoutePlaceIds(candidates, nextInterests, routePlaceCount)
     if (picked.length) setRoutePlaceIds(picked)
-  }, [realLocations, interests, props.initialRoutePlaceIds, selectedTags, routePlaceCount, loading])
+  }, [realLocations, interests, props.initialRoutePlaceIds, selectedTags, routePlaceCount, loading, routeBuildMode])
 
   useEffect(() => {
     if (loading || !interests || realLocations.length === 0) return
+    if (routeBuildMode !== 'auto') return
     if (props.initialRoutePlaceIds?.length && selectedTags.length === 0) return
 
     const candidates = filterLocationsByTagChips(realLocations, selectedTags)
     const nextInterests = buildInterestsFromTagChips(interests, selectedTags)
     const picked = pickRoutePlaceIds(candidates, nextInterests, routePlaceCount)
     if (picked.length) setRoutePlaceIds(picked)
-  }, [selectedTags, interests, routePlaceCount, realLocations, props.initialRoutePlaceIds?.length, loading])
+  }, [selectedTags, interests, routePlaceCount, realLocations, props.initialRoutePlaceIds?.length, loading, routeBuildMode])
 
   // 3. ВЫЧИСЛЯЕМЫЕ ЗНАЧЕНИЯ (MEMO)
   const availableChips = useMemo(() => {
@@ -142,27 +159,18 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
   void _mapCenter
 
   const routeLocations = useMemo(() => {
-    if (externalRouteLocations) return externalRouteLocations
-    if (loading) return []
-    return routePlaceIds.map((id) => getById(id, realLocations)).filter(Boolean) as Location[]
-  }, [routePlaceIds, realLocations, loading, externalRouteLocations])
+    if (loading && !routePlaceIds.length) return []
+    return routePlaceIds.map((id) => getLocationForRoute(id)).filter(Boolean) as Location[]
+  }, [routePlaceIds, loading, getLocationForRoute])
 
   const routeDays = Math.max(1, routeLocations.length - 1)
-  
+
   const timeline = useMemo(() => {
-    if (externalRouteLocations) {
-      return externalRouteLocations.slice(0, -1).map((loc, i) => ({
-        day: i + 1,
-        fromPlaceId: loc.id,
-        toPlaceId: externalRouteLocations[i + 1].id,
-        transport: '🚶 Пешком',
-        stay: '',
-        food: '',
-      }))
-    }
-    if (!interests || loading || realLocations.length === 0) return []
-    return buildTimeline(routePlaceIds, realLocations, interests, routeDays)
-  }, [routePlaceIds, interests, routeDays, realLocations, loading, externalRouteLocations])
+    if (!interests) return []
+    const pool = routePlaceIds.map((id) => getLocationForRoute(id)).filter(Boolean) as Location[]
+    if (pool.length < 2) return []
+    return buildTimeline(routePlaceIds, pool, interests, routeDays)
+  }, [routePlaceIds, interests, routeDays, getLocationForRoute])
 
   const selectedPlace = useMemo(() => {
     if (!selectedPlaceId || loading) return null
@@ -207,6 +215,48 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
       }
     }, 500); // Задержка 500ms
   }, []);
+
+  const addToRoute = useCallback((placeId: string) => {
+    setRouteBuildMode('manual')
+    setRoutePlaceIds((prev) => (prev.includes(placeId) ? prev : [...prev, placeId]))
+  }, [])
+
+  const removeFromRoute = useCallback((placeId: string) => {
+    setRouteBuildMode('manual')
+    setRoutePlaceIds((prev) => prev.filter((id) => id !== placeId))
+  }, [])
+
+  const moveRouteStep = useCallback((index: number, delta: number) => {
+    setRouteBuildMode('manual')
+    setRoutePlaceIds((prev) => {
+      const j = index + delta
+      if (j < 0 || j >= prev.length) return prev
+      const next = [...prev]
+      const t = next[index]!
+      next[index] = next[j]!
+      next[j] = t
+      return next
+    })
+  }, [])
+
+  const resumeAutoRoute = useCallback(() => {
+    setRouteBuildMode('auto')
+    if (!interests || realLocations.length === 0) return
+    const candidates = filterLocationsByTagChips(realLocations, selectedTags)
+    const nextInterests = buildInterestsFromTagChips(interests, selectedTags)
+    const picked = pickRoutePlaceIds(candidates, nextInterests, routePlaceCount)
+    if (picked.length) setRoutePlaceIds(picked)
+  }, [interests, realLocations, selectedTags, routePlaceCount])
+
+  const mapDefaultCenter = useMemo((): [number, number] => {
+    if (routeLocations.length) {
+      return [
+        routeLocations.reduce((s, l) => s + l.lat, 0) / routeLocations.length,
+        routeLocations.reduce((s, l) => s + l.lng, 0) / routeLocations.length,
+      ]
+    }
+    return [45.035, 38.975]
+  }, [routeLocations])
 
   // 4. УСЛОВНЫЕ ВОЗВРАТЫ ДЛЯ ЭКРАНОВ ЗАГРУЗКИ И ОШИБОК (ПОСЛЕ ВСЕХ ХУКОВ)
   if (loading) {
@@ -343,13 +393,8 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
               <YMap
                 onBoundsChange={handleBoundsChange}
                 defaultState={{
-                  center: externalRouteLocations?.length
-                    ? [
-                        externalRouteLocations.reduce((s, l) => s + l.lat, 0) / externalRouteLocations.length,
-                        externalRouteLocations.reduce((s, l) => s + l.lng, 0) / externalRouteLocations.length,
-                      ]
-                    : [45.035, 38.975],
-                  zoom: externalRouteLocations?.length ? 12 : 8,
+                  center: mapDefaultCenter,
+                  zoom: routeLocations.length ? 12 : 8,
                 }}
                 width="100%"
                 height="100%"
@@ -403,7 +448,54 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
 
           <div className="timelineOverlay">
             <div className="card timelineCard">
-              <div className="timelineTitle">Таймлайн маршрута</div>
+              <div className="timelineTitle" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                <span>Маршрут</span>
+                <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.75 }}>
+                  {routeBuildMode === 'manual' ? 'Ручной' : 'Авто'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                <button type="button" className="secondaryBtn" style={{ fontSize: 12, padding: '6px 10px' }} onClick={resumeAutoRoute}>
+                  Снова автоподбор
+                </button>
+              </div>
+              {routePlaceIds.length > 0 && (
+                <div className="timelineRouteOrder" style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Порядок точек</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {routePlaceIds.map((id, idx) => {
+                      const name = getLocationForRoute(id)?.name ?? id
+                      return (
+                        <div
+                          key={`${id}_${idx}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontSize: 13,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <span style={{ opacity: 0.7, minWidth: 22 }}>{idx + 1}.</span>
+                          <span style={{ flex: 1, minWidth: 0 }}>{name}</span>
+                          <button type="button" className="secondaryBtn" style={{ padding: '4px 8px', fontSize: 11 }} disabled={idx === 0} onClick={() => moveRouteStep(idx, -1)} aria-label="Выше">
+                            ↑
+                          </button>
+                          <button type="button" className="secondaryBtn" style={{ padding: '4px 8px', fontSize: 11 }} disabled={idx >= routePlaceIds.length - 1} onClick={() => moveRouteStep(idx, 1)} aria-label="Ниже">
+                            ↓
+                          </button>
+                          <button type="button" className="secondaryBtn" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => removeFromRoute(id)}>
+                            ×
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="timelineTitle" style={{ fontSize: 14, marginTop: 4, marginBottom: 8 }}>
+                По дням
+              </div>
               <div className="timelineItems">
                 {timeline.map((t) => (
                   <div className="timelineItem" key={`${t.day}_${t.fromPlaceId}_${t.toPlaceId}`}>
@@ -431,6 +523,9 @@ export default function Map(props: { profile: AuthProfile; initialRoutePlaceIds?
             open={Boolean(selectedPlace)}
             profile={props.profile}
             place={selectedPlace}
+            routePlaceIds={routePlaceIds}
+            onRouteAdd={addToRoute}
+            onRouteRemove={removeFromRoute}
             onClose={() => setSelectedPlaceId(null)}
             onMore={() => {
               if (!selectedPlace) return

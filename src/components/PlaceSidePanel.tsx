@@ -14,6 +14,9 @@ export default function PlaceSidePanel(props: {
   onClose: () => void
   onMore: () => void
   onAtmosphere: () => void
+  routePlaceIds?: string[]
+  onRouteAdd?: (placeId: string) => void
+  onRouteRemove?: (placeId: string) => void
 }) {
   const { open, place, profile } = props
 
@@ -52,6 +55,10 @@ export default function PlaceSidePanel(props: {
           </div>
           <PlaceCardFull
             {...cardProps}
+            placeId={place.id}
+            routeInRoute={props.routePlaceIds?.includes(place.id)}
+            onRouteAdd={props.onRouteAdd ? () => props.onRouteAdd!(place.id) : undefined}
+            onRouteRemove={props.onRouteRemove ? () => props.onRouteRemove!(place.id) : undefined}
             onClose={props.onClose}
             onMore={props.onMore}
             onAtmosphere={props.onAtmosphere}

@@ -9,6 +9,9 @@ import Preloader from '../Preloader'
 
 const ROUTE_COLOR = '#16a34a'
 
+/** Стабильная ссылка: `?? []` на каждом рендере ломает useMemo/useEffect и даёт цикл setState. */
+const EMPTY_POINTS: TourPoint[] = []
+
 export default function TourMap(props: {
   tour: Tour | null
   routeMode: 'auto' | 'pedestrian' | 'bicycle'
@@ -18,7 +21,7 @@ export default function TourMap(props: {
   const [routeLoading, setRouteLoading] = useState(false)
   const prevKeyRef = useRef('')
 
-  const points = props.tour?.points ?? []
+  const points = props.tour?.points?.length ? props.tour.points : EMPTY_POINTS
 
   const center = useMemo<[number, number]>(() => {
     if (!points.length) return [44.8, 38.5]

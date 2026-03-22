@@ -6,6 +6,9 @@ import PlaceModal from './PlaceModal'
 import TourMap from './TourMap'
 import type { ChatMessage, FlowPhase, RouteStep, SuggestedPlace, Tour, TourPoint } from './types'
 import { enrichTourPoints } from '../../services/enrichment'
+import { estimateExperienceCost, type ExperienceCostLine } from '../../utils/experienceCost'
+import { buildFourTourVariants } from '../../utils/tourVariants'
+import { averageRatingForPlaceIds } from '../../utils/reviewsStorage'
 import { loadTrips, saveTrips } from '../../utils/storage'
 import Preloader from '../Preloader'
 import '../../styles/generate.scss'
@@ -209,6 +212,7 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
 
   const [chatDraft, setChatDraft] = useState('')
   const [lastPrompt, setLastPrompt] = useState('')
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pollGenRef = useRef(0)
 
@@ -379,6 +383,7 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
     setSelectedIds(new Set())
     setStartPoint(null)
     setTour(null)
+    setSelectedVariantId(null)
 
     setMessages(prev => [...prev, { id: makeId('m'), role: 'user', text: prompt }])
 
@@ -437,7 +442,12 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
     routeRequestedAtRef.current = new Date().toISOString()
 
     const selected = suggestions.filter(p => selectedIds.has(p.id))
-    const sp = startPoint ?? { name: selected[0].name, lat: selected[0].lat, lon: selected[0].lon }
+    const variant = tourVariants.find((v) => v.id === selectedVariantId) ?? tourVariants[0]
+    const byId = new globalThis.Map(selected.map((s) => [s.id, s] as const))
+    const orderedSelected = variant
+      ? variant.orderedPlaceIds.map((id) => byId.get(id)).filter(Boolean) as typeof selected
+      : selected
+    const sp = startPoint ?? { name: orderedSelected[0].name, lat: orderedSelected[0].lat, lon: orderedSelected[0].lon }
 
     try {
       const res = await fetch(`${API_BASE}/api/generate_route`, {
@@ -447,7 +457,7 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
           login,
           transport_mode: routeMode === 'pedestrian' ? 'пешеход' : routeMode === 'bicycle' ? 'велосипед' : 'авто',
           start_point: sp,
-          suggested_places: selected,
+          suggested_places: orderedSelected.length ? orderedSelected : selected,
         }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -470,27 +480,76 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
     })
   }
 
+  const selectedPlaces = useMemo(
+    () => suggestions.filter((p) => selectedIds.has(p.id)),
+    [suggestions, selectedIds],
+  )
+
+  const tourVariants = useMemo(() => {
+    if (selectedPlaces.length < 2) return []
+    return buildFourTourVariants(selectedPlaces, {
+      interests: props.profile.interests,
+      prompt: lastPrompt,
+      startPoint: startPoint ? { lat: startPoint.lat, lon: startPoint.lon } : null,
+    })
+  }, [selectedPlaces, lastPrompt, props.profile.interests, startPoint])
+
+  useEffect(() => {
+    if (tourVariants.length) setSelectedVariantId(tourVariants[0].id)
+    else setSelectedVariantId(null)
+  }, [tourVariants])
+
   const previewTour = useMemo<Tour | null>(() => {
     if (tour) return tour
     if (!suggestions.length || phase === 'idle' || phase === 'chatting') return null
-    const selected = suggestions.filter(p => selectedIds.has(p.id))
+    const selected = suggestions.filter((p) => selectedIds.has(p.id))
     if (!selected.length) return null
+    const variant =
+      tourVariants.find((v) => v.id === selectedVariantId) ?? tourVariants[0] ?? null
+    let orderedPoints: TourPoint[]
+    if (variant) {
+      const byId = new globalThis.Map(selected.map((s) => [s.id, s] as const))
+      orderedPoints = variant.orderedPlaceIds
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((s) => suggestedToTourPoint(s!))
+    } else {
+      orderedPoints = selected.map(suggestedToTourPoint)
+    }
+    const vMeta = variant ?? tourVariants[0]
     return {
       id: 'preview',
-      title: 'Предпросмотр',
+      title: vMeta?.title ?? 'Предпросмотр',
       duration: 0,
-      description: '',
+      description: vMeta?.subtitle ?? '',
       price: '',
       tags: [],
-      points: selected.map(suggestedToTourPoint),
+      points: orderedPoints,
     }
-  }, [suggestions, selectedIds, tour, phase])
+  }, [suggestions, selectedIds, tour, phase, tourVariants, selectedVariantId])
 
   const routeEstimate = useMemo<RouteEstimate | null>(() => {
     const pts = previewTour?.points
     if (!pts || pts.length < 2) return null
     return estimateRoute(pts, routeMode)
   }, [previewTour, routeMode])
+
+  const experienceBreakdown = useMemo(() => {
+    const pts = previewTour?.points
+    if (!pts?.length) return null
+    const days = Math.max(1, Math.ceil((routeEstimate?.totalMinutes ?? 480) / 480))
+    return estimateExperienceCost({
+      points: pts,
+      transportRub: routeEstimate?.costRub ?? 0,
+      tripDays: days,
+      people: 2,
+    })
+  }, [previewTour, routeEstimate])
+
+  const tourRouteReviewsAvg = useMemo(() => {
+    if (!tour?.points.length) return null
+    return averageRatingForPlaceIds(tour.points.map((p) => p.id))
+  }, [tour])
 
   /* ---------- render ---------- */
   const phaseLabel = (): { label: string; sublabel: string } => {
@@ -599,6 +658,46 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
                 })}
               </div>
 
+              {tourVariants.length > 0 && (
+                <div style={{ marginTop: 18 }}>
+                  <div className="generatePanel__head" style={{ marginBottom: 10 }}>
+                    <h3 className="generatePanel__title" style={{ fontSize: 17 }}>
+                      Сценарии маршрута
+                    </h3>
+                    <p className="generatePanel__desc" style={{ marginTop: 4 }}>
+                      До четырёх вариантов порядка точек — выберите сценарий, затем постройте маршрут
+                    </p>
+                  </div>
+                  <div className="suggestionsGrid">
+                    {tourVariants.map((v) => {
+                      const ptsForEst = v.orderedPlaceIds
+                        .map((id) => suggestions.find((s) => s.id === id))
+                        .filter(Boolean)
+                        .map((s) => ({ lat: s!.lat, lng: s!.lon }))
+                      const est =
+                        ptsForEst.length >= 2 ? estimateRoute(ptsForEst, routeMode) : { totalKm: 0, travelMinutes: 0, visitMinutes: 0, totalMinutes: 0, costRub: 0 }
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          className={`suggestionCard ${selectedVariantId === v.id ? 'suggestionCard--active' : ''}`}
+                          onClick={() => setSelectedVariantId(v.id)}
+                          style={{ textAlign: 'left', cursor: 'pointer', border: '2px solid transparent' }}
+                        >
+                          <div className="suggestionCard__body">
+                            <div className="suggestionCard__name">{v.title}</div>
+                            <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>{v.subtitle}</div>
+                            <div style={{ fontSize: 12, marginTop: 8, opacity: 0.75 }}>
+                              {v.orderedPlaceIds.length} точек · ~{est.totalKm.toFixed(1)} км
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <div className="generateTransportSwitch">
                   {([
@@ -664,6 +763,22 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
                   )}
                 </div>
               )}
+              {experienceBreakdown && (
+                <div className="routeEstimate" style={{ marginTop: 12, flexDirection: 'column', alignItems: 'stretch' }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Оценка стоимости опыта</div>
+                  <div style={{ fontSize: 15, marginBottom: 8 }}>{experienceBreakdown.summaryLabel}</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, opacity: 0.9, lineHeight: 1.5 }}>
+                    {experienceBreakdown.lines.map((line: ExperienceCostLine) => (
+                      <li key={line.key}>
+                        {line.label}: от {line.minRub.toLocaleString('ru-RU')} до {line.maxRub.toLocaleString('ru-RU')} ₽
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ fontSize: 12, opacity: 0.65, marginTop: 8 }}>
+                    Ориентировочно, не включает перелёт и личные траты
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
@@ -673,6 +788,11 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
               <div className="generatePanel__head">
                 <h2 className="generatePanel__title">{tour.title}</h2>
                 <p className="generatePanel__desc">{tour.description}</p>
+                {tourRouteReviewsAvg != null && (
+                  <p className="generatePanel__desc" style={{ marginTop: 8 }}>
+                    Средняя оценка по точкам (локальные отзывы): <strong>{tourRouteReviewsAvg.toFixed(1)}</strong> / 5
+                  </p>
+                )}
               </div>
               <div className="suggestionsGrid">
                 {tour.points.map((p, i) => (
@@ -722,6 +842,19 @@ export default function GeneratePage(props: { profile: AuthProfile; onPickRoute:
                       <span>Бесплатно</span>
                     </div>
                   )}
+                </div>
+              )}
+              {experienceBreakdown && (
+                <div className="routeEstimate" style={{ marginTop: 12, flexDirection: 'column', alignItems: 'stretch' }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Оценка стоимости опыта</div>
+                  <div style={{ fontSize: 15, marginBottom: 8 }}>{experienceBreakdown.summaryLabel}</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, opacity: 0.9, lineHeight: 1.5 }}>
+                    {experienceBreakdown.lines.map((line: ExperienceCostLine) => (
+                      <li key={line.key}>
+                        {line.label}: от {line.minRub.toLocaleString('ru-RU')} до {line.maxRub.toLocaleString('ru-RU')} ₽
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>

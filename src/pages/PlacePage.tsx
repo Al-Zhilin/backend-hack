@@ -7,7 +7,7 @@ import type { Location } from '../data/locations'
 import AtmosphereModal from '../components/AtmosphereModal'
 import PlaceFullWidthHero from '../components/PlaceFullWidthHero'
 import { getMatchedTagChipIds, TAG_CHIPS } from '../utils/tagChips'
-import { locationToCardProps } from '../components/PlaceCard'
+import { locationToCardProps, PlaceReviewsBlock } from '../components/PlaceCard'
 import '../styles/place-card.scss'
 
 function getPhotos(place: Location) {
@@ -123,6 +123,17 @@ export default function PlacePage(props: { profile: AuthProfile | null }) {
                 </div>
               </div>
             )}
+          </section>
+
+          <section
+            style={{
+              borderRadius: 18,
+              border: '1px solid var(--border)',
+              background: 'rgba(255,255,255,0.85)',
+              padding: 16,
+            }}
+          >
+            <PlaceReviewsBlock placeId={place.id} />
           </section>
 
           <section

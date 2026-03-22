@@ -4,6 +4,11 @@ import type { PlaceTypeId } from '../types'
  * Категории Geoapify Places API (v2), группами — до 100 объектов на запрос.
  * Список: https://apidocs.geoapify.com/docs/places/
  */
+/**
+ * Группы категорий Geoapify Places API (v2). Полный перечень объектов региона недостижим
+ * из‑за лимитов API; здесь максимально широкое покрытие типов для Кубани.
+ * @see https://apidocs.geoapify.com/docs/places/
+ */
 export const GEOAPIFY_CATEGORY_BATCHES: string[][] = [
   [
     'production.winery',
@@ -13,11 +18,15 @@ export const GEOAPIFY_CATEGORY_BATCHES: string[][] = [
     'catering.bar',
     'catering.fast_food',
   ],
-  ['leisure.park', 'natural.forest', 'natural.reserve', 'beach.beach_resort'],
+  ['leisure.park', 'natural.forest', 'natural.reserve', 'beach.beach_resort', 'natural.water'],
   ['entertainment', 'tourism.museum', 'tourism.attraction', 'tourism.sights', 'building.historic', 'building.tourism'],
-  ['commercial.farm', 'accommodation.hotel', 'accommodation.guest_house', 'accommodation.hostel'],
-  ['sport.hiking', 'leisure.playground'],
+  ['commercial.farm', 'accommodation.hotel', 'accommodation.guest_house', 'accommodation.hostel', 'accommodation.motel'],
+  ['sport.hiking', 'leisure.playground', 'sport.ski', 'leisure.spa'],
+  ['public.transport', 'service.car_repair', 'tourism.information'],
 ]
+
+/** Все категории из батчей — для запроса по видимой области карты (одна строка). */
+export const GEOAPIFY_FLAT_CATEGORIES_FOR_BOUNDS = [...new Set(GEOAPIFY_CATEGORY_BATCHES.flat())]
 
 const EXACT: Record<string, PlaceTypeId[]> = {
   'production.winery': ['wineries'],
@@ -45,6 +54,10 @@ export function geoCategoryToPlaceTypes(category: string): PlaceTypeId[] {
   }
 
   if (c.includes('hiking') || c.includes('trail') || c.includes('climbing')) return ['trekking_routes']
+
+  if (c.includes('spa') || c.includes('wellness')) return ['reserves']
+
+  if (c.includes('ski')) return ['trekking_routes']
 
   if (c.includes('playground') || c === 'entertainment' || c.startsWith('entertainment.')) {
     return ['kids_entertainment']

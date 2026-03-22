@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
 import type { AuthProfile } from './types'
-import { clearProfile, loadProfile, loadTrips } from './utils/storage'
+import { clearProfile, loadProfile, loadTrips, recommendationsNavSeasonLabel } from './utils/storage'
 
 import AuthPage from './components/AuthPage'
 import InteractiveMap from './components/InteractiveMap'
@@ -92,10 +92,9 @@ export default function App() {
               to="/trips"
               active={activePath === '/trips'}
             />
-            <SidebarItem label="История поездок" to="/history" active={activePath === '/history'} />
             <SidebarItem label="Профиль и интересы" to="/profile" active={activePath === '/profile'} />
             <SidebarItem
-              label={`Рекомендации: ${profile.interests ? profile.interests.season : ''}`.trim()}
+              label={`Рекомендации: ${recommendationsNavSeasonLabel(profile.interests)}`.trim()}
               to="/recommendations"
               active={activePath === '/recommendations'}
             />
@@ -144,12 +143,6 @@ export default function App() {
                 label={`Мои путешествия${trips.length ? ` (${trips.length})` : ''}`}
                 to="/trips"
                 active={activePath === '/trips'}
-                onNavigate={() => setDrawerOpen(false)}
-              />
-              <SidebarItem
-                label="История поездок"
-                to="/history"
-                active={activePath === '/history'}
                 onNavigate={() => setDrawerOpen(false)}
               />
               <SidebarItem
@@ -208,7 +201,6 @@ export default function App() {
               />
 
               <Route path="/trips" element={<TripsPage />} />
-              <Route path="/history" element={<div className="page">Заглушка: история поездок.</div>} />
 
               {/* Полноэкранная “визитка места” */}
               <Route path="/place/:id" element={<PlacePage profile={profile} />} />

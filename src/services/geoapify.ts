@@ -1,3 +1,5 @@
+import { GEOAPIFY_FLAT_CATEGORIES_FOR_BOUNDS } from '../data/geoapifyPlaceMapping';
+
 const API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY as string;
 const BASE_URL_V1 = import.meta.env.VITE_GEOAPIFY_BASE_URL_V1 as string;
 const BASE_URL_V2 = import.meta.env.VITE_GEOAPIFY_BASE_URL_V2 as string;
@@ -34,20 +36,9 @@ export const geoService = {
   },
 
   async getPlacesByBounds(filterRect: string) {
-    const categories = [
-      'tourism.attraction',
-      'tourism.sights',
-      'catering.restaurant',
-      'catering.cafe',
-      'leisure.park',
-      'tourism.museum',
-      'natural.beach',
-      'entertainment',
-      'production.factory',
-      'commercial.food_and_drink'
-    ].join(',');
+    const categories = GEOAPIFY_FLAT_CATEGORIES_FOR_BOUNDS.join(',');
 
-    const url = `${BASE_URL_V2}/places?categories=${categories}&filter=rect:${filterRect}&limit=50&apiKey=${API_KEY}`;
+    const url = `${BASE_URL_V2}/places?categories=${categories}&filter=rect:${filterRect}&limit=80&apiKey=${API_KEY}`;
 
     const response = await fetch(url);
     

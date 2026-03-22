@@ -24,6 +24,7 @@ export default function PlaceModal(props: {
       workingHours={props.point.workingHours}
       lat={props.point.lat}
       lng={props.point.lng}
+      placeId={props.point.id}
     />
   )
 }

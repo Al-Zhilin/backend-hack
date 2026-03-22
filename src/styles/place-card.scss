@@ -290,3 +290,104 @@
   font-weight: 800;
   text-decoration: underline;
 }
+
+.placeReviews {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: $radius-md;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.placeReviews__title {
+  font-weight: 900;
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.placeReviews__avg {
+  font-size: 14px;
+  margin-bottom: 10px;
+  opacity: 0.9;
+}
+
+.placeReviews__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.placeReviews__item {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.placeReviews__itemHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.placeReviews__author {
+  font-weight: 750;
+}
+
+.placeReviews__stars {
+  letter-spacing: 1px;
+  opacity: 0.85;
+}
+
+.placeReviews__text {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  opacity: 0.92;
+}
+
+.placeReviews__empty {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-bottom: 10px;
+}
+
+.placeReviews__form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.placeReviews__formRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.placeReviews__input,
+.placeReviews__select,
+.placeReviews__textarea {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.placeReviews__input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.placeReviews__textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.placeReviews__submit {
+  align-self: flex-start;
+}
