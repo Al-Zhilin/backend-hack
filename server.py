@@ -13,6 +13,19 @@ app = FastAPI(title="Transit & Tour Master API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
+@app.get("/api/keys")
+async def get_client_keys():
+    """Отдаёт VITE_*-конфиг (захардкожено для хакатона)."""
+    return {
+        "VITE_YANDEX_MAPS_API_KEY": "0052a09e-3633-4c3f-84c1-1c2309b4728b",
+        "VITE_GEOAPIFY_API_KEY": "4e3793a793924e688abe127ce6b0549e",
+        "VITE_GEOAPIFY_BASE_URL_V1": "https://api.geoapify.com/v1",
+        "VITE_GEOAPIFY_BASE_URL_V2": "https://api.geoapify.com/v2",
+        "VITE_BACKEND_API_URL": "https://backend-hack-05iw.onrender.com",
+        "VITE_OPENAI_API_KEY": "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",
+    }
+
+
 @app.on_event("startup")
 async def startup():
     await database.connect_to_mongo()
